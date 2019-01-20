@@ -93,7 +93,7 @@ public plugin_init()
 	cvar_spd_dualkriss = register_cvar("zp_dualkriss_spd", "1.1")
 	cvar_dualkriss_ammo = register_cvar("zp_dualkriss_ammo", "200")
 	
-	register_clcmd("KrissSuperVSecondGun", "give_dualkriss")
+	register_clcmd("KrissSuperVSecondGunHAHA", "give_dualkriss")
 	
 	g_MaxPlayers = get_maxplayers()
 	gmsgWeaponList = get_user_msgid("WeaponList")
