@@ -36,12 +36,13 @@ const OFFSET_LINUX_WEAPONS = 4
 
 #define write_coord_f(%1)	engfunc(EngFunc_WriteCoord,%1)
 
-new const Fire_Sounds[][] = { "weapons/dualkriss.wav" }
+new const Fire_Sounds[][] = { "weapons/kvector-1.wav", "weapons/kvector-2.wav" }
+new const Effect_Sounds[][] = { "weapons/vector/BoltRelease.wav", "weapons/vector/cloth1.wav", "weapons/vector/cloth2.wav", "weapons/vector/draw.wav", "weapons/vector/MagIn.wav", "weapons/vector/MagOut.wav", "weapons/vector/MagInsert.wav", "weapons/vector/MagRelease.wav" }
 new const Sound_Zoom[] = { "weapons/zoom.wav" }
 
-new dualkriss_V_MODEL[64] = "models/weapons/v_dualkriss.mdl"
-new dualkriss_P_MODEL[64] = "models/weapons/p_dualkriss.mdl"
-new dualkriss_W_MODEL[64] = "models/weapons/w_dualkriss.mdl"
+new dualkriss_V_MODEL[64] = "models/FAITH/v_vector.mdl"
+new dualkriss_P_MODEL[64] = "models/FAITH/p_vector.mdl"
+new dualkriss_W_MODEL[64] = "models/FAITH/w_vector.mdl"
 
 new const GUNSHOT_DECALS[] = { 41, 42, 43, 44, 45 }
 
@@ -61,7 +62,6 @@ public plugin_init()
 	register_plugin("[ZP] Extra: Dual Kriss Super V", "1.0", "Crock / =) (Poprogun4ik) / LARS-DAY[BR]EAKER")
 	register_message(get_user_msgid("DeathMsg"), "message_DeathMsg")
 	register_event("CurWeapon","CurrentWeapon","be","1=1")
-        register_clcmd("buy_dk", "give_dualkriss")
 	RegisterHam(Ham_Item_AddToPlayer, "weapon_ump45", "fw_dualkriss_AddToPlayer")
 	RegisterHam(Ham_Use, "func_tank", "fw_UseStationary_Post", 1)
 	RegisterHam(Ham_Use, "func_tankmortar", "fw_UseStationary_Post", 1)
@@ -87,11 +87,13 @@ public plugin_init()
 	RegisterHam(Ham_TraceAttack, "func_plat", "fw_TraceAttack", 1)
 	RegisterHam(Ham_TraceAttack, "func_rotating", "fw_TraceAttack", 1)
 
-	cvar_dmg_dualkriss = register_cvar("zp_dualkriss_dmg", "1.8")
+	cvar_dmg_dualkriss = register_cvar("zp_dualkriss_dmg", "1.0")
 	cvar_recoil_dualkriss = register_cvar("zp_dualkriss_recoil", "0.94")
-	cvar_clip_dualkriss = register_cvar("zp_dualkriss_clip", "50")
-	cvar_spd_dualkriss = register_cvar("zp_dualkriss_spd", "0.98")
+	cvar_clip_dualkriss = register_cvar("zp_dualkriss_clip", "45")
+	cvar_spd_dualkriss = register_cvar("zp_dualkriss_spd", "1.0")
 	cvar_dualkriss_ammo = register_cvar("zp_dualkriss_ammo", "200")
+	
+	register_clcmd("KrissSuperVSecondGun", "give_dualkriss")
 	
 	g_MaxPlayers = get_maxplayers()
 	gmsgWeaponList = get_user_msgid("WeaponList")
@@ -103,18 +105,17 @@ public plugin_precache()
 	precache_model(dualkriss_P_MODEL)
 	precache_model(dualkriss_W_MODEL)
 	for(new i = 0; i < sizeof Fire_Sounds; i++)
-	precache_sound(Fire_Sounds[i])	
+	precache_sound(Fire_Sounds[i])
+	for(new i = 0; i < sizeof Effect_Sounds; i++)
+	precache_sound(Effect_Sounds[i])	
 	precache_sound(Sound_Zoom)
-	precache_sound("weapons/dualkriss_clipin.wav")
-	precache_sound("weapons/dualkriss_clipout.wav")
-	precache_sound("weapons/dualkriss_draw.wav")
 	m_iBlood[0] = precache_model("sprites/blood.spr")
 	m_iBlood[1] = precache_model("sprites/bloodspray.spr")
-	precache_generic("sprites/weapon_dualkriss.txt")
-   	precache_generic("sprites/wpn_sprites/640hud54.spr")
-    precache_generic("sprites/wpn_sprites/640hud7.spr")
+	precache_generic("sprites/weapon_kvector.txt")
+   	precache_generic("sprites/FAITH/640hud54.spr")
+    precache_generic("sprites/FAITH/640hud7.spr")
 	
-    register_clcmd("weapon_dualkriss", "weapon_hook")	
+    register_clcmd("weapon_kvector", "weapon_hook")	
 
 	register_forward(FM_PrecacheEvent, "fwPrecacheEvent_Post", 1)
 }
@@ -240,7 +241,7 @@ public give_dualkriss(id)
 		set_pdata_float(id, m_flNextAttack, 1.0, PLAYER_LINUX_XTRA_OFF)
 
 		message_begin(MSG_ONE, gmsgWeaponList, {0,0,0}, id)
-		write_string("weapon_dualkriss")
+		write_string("weapon_kvector")
 		write_byte(6)
 		write_byte(100)
 		write_byte(-1)
@@ -265,7 +266,7 @@ public fw_dualkriss_AddToPlayer(dualkriss, id)
 		entity_set_int(dualkriss, EV_INT_WEAPONKEY, 0)
 
 		message_begin(MSG_ONE, gmsgWeaponList, {0,0,0}, id)
-		write_string("weapon_dualkriss")
+		write_string("weapon_kvector")
 		write_byte(6)
 		write_byte(100)
 		write_byte(-1)
@@ -340,7 +341,7 @@ replace_weapon_models(id, weaponid)
 					set_pdata_float(id, m_flNextAttack, 1.0, PLAYER_LINUX_XTRA_OFF)
 
 					message_begin(MSG_ONE, gmsgWeaponList, {0,0,0}, id)
-					write_string("weapon_dualkriss")
+					write_string("weapon_kvector")
 					write_byte(6)
 					write_byte(100)
 					write_byte(-1)
@@ -438,7 +439,7 @@ public fw_dualkriss_PrimaryAttack_Post(Weapon)
 		xs_vec_add(push,cl_pushangle[Player],push)
 		set_pev(Player,pev_punchangle,push)
 		
-		emit_sound(Player, CHAN_WEAPON, Fire_Sounds[0], VOL_NORM, ATTN_NORM, 0, PITCH_NORM)
+		emit_sound(Player, CHAN_WEAPON, Fire_Sounds[random_num(0, 1)], VOL_NORM, ATTN_NORM, 0, PITCH_NORM)
 		new num
 		num = random_num(1,2)
 		if(num == 1)  UTIL_PlayWeaponAnimation(Player, random_num(dualkriss_SHOOT1,dualkriss_SHOOT3))
