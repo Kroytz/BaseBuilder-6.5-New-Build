@@ -11,6 +11,8 @@
 #define VERSION "S1v2"
 #define AUTHOR "EmeraldGhost"
 
+new const log_file[] = "BB_FGunBuyLog.txt"
+
 new g_fvault
 new g_iSelectPri[33]
 
@@ -188,6 +190,7 @@ public fshop2_handler(id, menu, item)
 			 {
 				if (get_user_gp(id) >= get_cvar_num("fgun1_cost"))
 				{
+					log_buy(id, 1)
 					g_xD0625_fgun1[id] = 1
 					set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun1_cost"))
 					client_printc(id, "\g[永久商城] \t你己购买了 \y416-C Carbine\t! 可到\y我的背包\t装备。")
@@ -211,6 +214,7 @@ public fshop2_handler(id, menu, item)
 		 {
 			if (get_user_gp(id) >= get_cvar_num("fgun2_cost"))
 			{
+				log_buy(id, 2)
 				g_xD0625_fgun2[id] = 1
 				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun2_cost"))
 				client_printc(id, "\g[永久商城] \t你己购买了 \yKriss Super V\t! 可到\y我的背包\t装备。")
@@ -2461,4 +2465,12 @@ stock client_printc(const id, const string[], {Float, Sql, Resul,_}:...)
 		write_string(msg);
 		message_end();  
 	}  
+}
+
+public log_buy(id, wpnid)
+{
+	new name[33]
+	get_user_name(id,name,31)
+	
+	log_to_file(log_file, " %s 购买武器 - 武器代号 [%d]", name, wpnid)
 }
