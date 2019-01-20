@@ -5,7 +5,6 @@
 #include <nvault>
 #include <fakemeta>
 #include <hamsandwich>
-#include <xD0625>
 #include <eg_boss>
 
 #define PLUGIN "[eG]基地建設永久商店"
@@ -42,7 +41,7 @@ public plugin_init()
     
     //請在這裡設定價錢
 	register_cvar("fgun1_cost", "100") 
-    register_cvar("fgun2_cost", "9999999") 
+    register_cvar("fgun2_cost", "100") 
     register_cvar("fgun3_cost", "9999999")  //永久槍3價錢
     register_cvar("fgun4_cost", "9999999")  //永久槍4價錢
     register_cvar("fgun5_cost", "9999999")  //永久槍5價錢
@@ -129,7 +128,7 @@ public fshop_gun(id) //永久商城主槍械(己列出例子)
 		new menu = menu_create("\r永久商城 - 永久枪", "fshop2_handler");
 				
 		menu_additem(menu, "\g[突击步枪]\y416-C Carbine     \g100 武器点", "1", 0);
-		menu_additem(menu, "不日推出", "2", 0);
+		menu_additem(menu, "\g[冲锋枪]\yKriss Super V     \g100 武器点", "2", 0);
 		menu_additem(menu, "不日推出", "3", 0);
 		menu_additem(menu, "不日推出", "4", 0);
 		menu_additem(menu, "不日推出", "5", 0);
@@ -208,14 +207,14 @@ public fshop2_handler(id, menu, item)
 		}
 		case 2:
 		{
-		 if (!g_xD0625_fgun1[id])
+		 if (!g_xD0625_fgun2[id])
 		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun1_cost"))
+			if (get_user_gp(id) >= get_cvar_num("fgun2_cost"))
 			{
-				g_xD0625_fgun1[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun1_cost"))
-				client_printc(id, "\g[永久商城] \t你己购买了 \y416-C Carbine\t! 可到\y我的背包\t装备。")
-				client_print(id, print_console, "[FGUNSHOP] 你己購買了 416-C Carbine!可到 我的背包 装备。") 
+				g_xD0625_fgun2[id] = 1
+				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun2_cost"))
+				client_printc(id, "\g[永久商城] \t你己购买了 \yKriss Super V\t! 可到\y我的背包\t装备。")
+				client_print(id, print_console, "[FGUNSHOP] 你己購買了 Kriss Super V ! 可到 我的背包 装备。") 
 			}
 			else
 			{
@@ -1075,13 +1074,13 @@ public myfg_menu(id)//裝備永久槍(己列出例子)
 	}
 	if (g_xD0625_fgun2[id])
 	{
-		formatex(option, charsmax(option), "鐵血重炮-M32  \r　: \y　己購買")
+		formatex(option, charsmax(option), "Kriss Super V  \r　: \y　己购买")
 		menu_additem(menu, option, "2", 0)
 		
 	}
 	else
 	{
-		formatex(option, charsmax(option), "鐵血重炮-M32  \y　: \r　未購買")
+		formatex(option, charsmax(option), "Kriss Super V  \y　: \r　未购买")
 		menu_additem(menu, option, "2", 0)	
 	}
 	if (g_xD0625_fgun3[id])
@@ -1336,8 +1335,17 @@ public my2_handler(id, menu, item)
 		}
 		case 2:
 		{
-		client_cmd(id, "use_m32")
-		myfg_menu(id)
+			if (g_xD0625_fgun2[id])
+			{
+				client_printc(id, "\g[枪械选择] \t你装备了 \yKriss Super V\t !")
+				client_cmd(id, "KrissSuperVSecondGunHAHA")
+				g_iSelectPri[id] = 1
+			}
+			else
+			{
+				client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
+				client_printc(id, "\g[枪械选择] \t请先到\y 永久商城 \t购买 !!")
+			}
 		}
 		case 3:
 		{

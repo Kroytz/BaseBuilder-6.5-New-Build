@@ -87,10 +87,10 @@ public plugin_init()
 	RegisterHam(Ham_TraceAttack, "func_plat", "fw_TraceAttack", 1)
 	RegisterHam(Ham_TraceAttack, "func_rotating", "fw_TraceAttack", 1)
 
-	cvar_dmg_dualkriss = register_cvar("zp_dualkriss_dmg", "1.0")
-	cvar_recoil_dualkriss = register_cvar("zp_dualkriss_recoil", "0.94")
+	cvar_dmg_dualkriss = register_cvar("zp_dualkriss_dmg", "1.05")
+	cvar_recoil_dualkriss = register_cvar("zp_dualkriss_recoil", "0.92")
 	cvar_clip_dualkriss = register_cvar("zp_dualkriss_clip", "45")
-	cvar_spd_dualkriss = register_cvar("zp_dualkriss_spd", "1.0")
+	cvar_spd_dualkriss = register_cvar("zp_dualkriss_spd", "1.1")
 	cvar_dualkriss_ammo = register_cvar("zp_dualkriss_ammo", "200")
 	
 	register_clcmd("KrissSuperVSecondGun", "give_dualkriss")
