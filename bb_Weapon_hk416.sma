@@ -92,7 +92,7 @@ public plugin_init()
 	cvar_spd_hk416 = register_cvar("hk416_spd", "1.0")
 	cvar_hk416_ammo = register_cvar("hk416_ammo", "200")
 	
-	register_clcmd("Hk416AssaultRifle","give_hk416")
+	register_clcmd("Hk416AssaultRifleHAHA","give_hk416")
 	g_MaxPlayers = get_maxplayers()
 	gmsgWeaponList = get_user_msgid("WeaponList")
 }
@@ -444,7 +444,7 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage)
 		if(get_user_weapon(attacker) == CSW_M4A1)
 		{
 			if(g_has_hk416[attacker])
-				SetHamParamFloat(4, (damage * 1.02))
+				SetHamParamFloat(4, (damage * 1.01))
 		}
 	}
 }
