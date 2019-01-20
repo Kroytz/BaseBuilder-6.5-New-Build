@@ -88,11 +88,11 @@ public plugin_init()
 	RegisterHam(Ham_TraceAttack, "func_rotating", "fw_TraceAttack", 1)
 
 	cvar_recoil_hk416 = register_cvar("hk416_recoil", "0.75")
-	cvar_clip_hk416 = register_cvar("hk416_clip", "35")
+	cvar_clip_hk416 = register_cvar("hk416_clip", "32")
 	cvar_spd_hk416 = register_cvar("hk416_spd", "1.0")
 	cvar_hk416_ammo = register_cvar("hk416_ammo", "200")
 	
-	register_clcmd("Hk416AssaultRifleHAHA","give_hk416")
+	register_clcmd("Hk416AssaultRifle","give_hk416")
 	g_MaxPlayers = get_maxplayers()
 	gmsgWeaponList = get_user_msgid("WeaponList")
 }
