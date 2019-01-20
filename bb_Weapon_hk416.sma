@@ -444,7 +444,7 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage)
 		if(get_user_weapon(attacker) == CSW_M4A1)
 		{
 			if(g_has_hk416[attacker])
-				SetHamParamFloat(4, (damage * 1.02))
+				SetHamParamFloat(4, (damage * 1.01))
 		}
 	}
 }
