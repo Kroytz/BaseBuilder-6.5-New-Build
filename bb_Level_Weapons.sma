@@ -1328,7 +1328,7 @@ public my2_handler(id, menu, item)
 			if (g_xD0625_fgun1[id])
 			{
 				client_printc(id, "\g[枪械选择] \t你装备了 \y416-C Carbine\t !")
-				client_cmd(id, "Hk416AssaultRifleHAHA")
+				client_cmd(id, DEF_HK416_CODE)
 				g_iSelectPri[id] = 1
 			}
 			else
@@ -1342,7 +1342,7 @@ public my2_handler(id, menu, item)
 			if (g_xD0625_fgun2[id])
 			{
 				client_printc(id, "\g[枪械选择] \t你装备了 \yKriss Super V\t !")
-				client_cmd(id, "KrissSuperVSecondGunHAHA")
+				client_cmd(id, DEF_KRISS_CODE)
 				g_iSelectPri[id] = 1
 			}
 			else

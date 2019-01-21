@@ -5,6 +5,7 @@
 #include <hamsandwich>
 #include <xs>
 #include <cstrike>
+#include <eg_boss>
 
 #define ENG_NULLENT			-1
 #define EV_INT_WEAPONKEY	EV_INT_impulse
@@ -93,7 +94,7 @@ public plugin_init()
 	cvar_spd_dualkriss = register_cvar("zp_dualkriss_spd", "1.1")
 	cvar_dualkriss_ammo = register_cvar("zp_dualkriss_ammo", "200")
 	
-	register_clcmd("KrissSuperVSecondGunHAHA", "give_dualkriss")
+	register_clcmd(DEF_KRISS_CODE, "give_dualkriss")
 	
 	g_MaxPlayers = get_maxplayers()
 	gmsgWeaponList = get_user_msgid("WeaponList")
