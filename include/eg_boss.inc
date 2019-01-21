@@ -21,6 +21,7 @@ native set_user_sp(id, value)
 native get_user_gp(id)
 native set_user_gp(id, value)
 
+/*	Use Less
 native get_user_fgun4(id)
 native set_user_fgun4(id, value)
 native get_user_fgun5(id)
@@ -52,3 +53,4 @@ native give_m32(id)
 native give_buffak(id)
 native give_sgdrill(id)
 native give_tbex(id)
+*/
