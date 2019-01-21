@@ -5,6 +5,7 @@
 #include <hamsandwich>
 #include <xs>
 #include <cstrike>
+#include <eg_boss>
 
 #define ENG_NULLENT				-1
 #define EV_INT_WEAPONKEY		EV_INT_impulse
@@ -92,7 +93,7 @@ public plugin_init()
 	cvar_spd_hk416 = register_cvar("hk416_spd", "1.0")
 	cvar_hk416_ammo = register_cvar("hk416_ammo", "200")
 	
-	register_clcmd("Hk416AssaultRifleHAHA","give_hk416")
+	register_clcmd(DEF_HK416_CODE, "give_hk416")
 	g_MaxPlayers = get_maxplayers()
 	gmsgWeaponList = get_user_msgid("WeaponList")
 }
