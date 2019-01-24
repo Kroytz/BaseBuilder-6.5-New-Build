@@ -2,24 +2,32 @@
 #include <amxmisc>
 #include <cstrike>
 #include <fun>
-#include <nvault>
+#include <dbi>
 #include <fakemeta>
 #include <hamsandwich>
 #include <eg_boss>
 
-#define PLUGIN "[eG]基地建設永久商店"
+#define PLUGIN "[BB] 永久商城"
 #define VERSION "S1v2"
 #define AUTHOR "EmeraldGhost"
 
+//SQL variable
+new Sql:sql
+new Result:result
+new error[33]
+
+new const is_bought_gun[][] = { "未购买", "已购买" }
+new const gun_type[][] = { "null", "[突击步枪]", "[冲锋枪]" }
+new const gun_name[][] = { "null", "416-C Carbine", "Kriss Super V" }
+new const gun_cost[] = { 0, 100, 100 }
+new const gun_code[][] = { "null", "hk416", "kriss"}
+
 new const log_file[] = "BB_FGunBuyLog.txt"
 
-new g_fvault
 new g_iSelectPri[33]
 
-//永久槍代數(目前二十項,如有更多請按照這樣再增加,不慬的話請告訴我)
-new g_xD0625_fgun1[33], g_xD0625_fgun2[33], g_xD0625_fgun3[33], g_xD0625_fgun4[33], g_xD0625_fgun5[33], g_xD0625_fgun6[33], g_xD0625_fgun7[33],
-    g_xD0625_fgun8[33], g_xD0625_fgun9[33], g_xD0625_fgun10[33], g_xD0625_fgun11[33], g_xD0625_fgun12[33], g_xD0625_fgun13[33], g_xD0625_fgun14[33],
-    g_xD0625_fgun15[33], g_xD0625_fgun16[33], g_xD0625_fgun17[33], g_xD0625_fgun18[33], g_xD0625_fgun19[33], g_xD0625_fgun20[33]
+//永久槍代數
+new g_iForeverGun[33][sizeof gun_code]
 
 //永久手槍代數(目前十項,如有更多請按照這樣再增加,不慬的話請告訴我)
 new g_xD0625_fhgun1[33], g_xD0625_fhgun2[33], g_xD0625_fhgun3[33], g_xD0625_fhgun4[33], g_xD0625_fhgun5[33], g_xD0625_fhgun6[33], g_xD0625_fhgun7[33], g_xD0625_fhgun8[33], g_xD0625_fhgun9[33], g_xD0625_fhgun10[33]
@@ -41,43 +49,19 @@ public plugin_init()
 	
 	RegisterHam(Ham_Spawn, 		"player", 	"ham_PlayerSpawn_Post", 1)
     
-    //請在這裡設定價錢
-	register_cvar("fgun1_cost", "100") 
-    register_cvar("fgun2_cost", "100") 
-    register_cvar("fgun3_cost", "9999999")  //永久槍3價錢
-    register_cvar("fgun4_cost", "9999999")  //永久槍4價錢
-    register_cvar("fgun5_cost", "9999999")  //永久槍5價錢
-    register_cvar("fgun6_cost", "9999999")  //永久槍6價錢
-    register_cvar("fgun7_cost", "9999999")  //永久槍7價錢
-    register_cvar("fgun8_cost", "9999999")  //永久槍8價錢
-    register_cvar("fgun9_cost", "9999999")  //永久槍9價錢
-    register_cvar("fgun10_cost", "9999999")//永久槍10價錢
-    register_cvar("fgun11_cost", "9999999")//永久槍11價錢
-    register_cvar("fgun12_cost", "9999999")//永久槍12價錢
-    register_cvar("fgun13_cost", "9999999")//永久槍13價錢
-    register_cvar("fgun14_cost", "9999999")//永久槍14價錢
-    register_cvar("fgun15_cost", "9999999")//永久槍15價錢
-    register_cvar("fgun16_cost", "9999999")//永久槍16價錢
-    register_cvar("fgun17_cost", "9999999")//永久槍17價錢
-    register_cvar("fgun18_cost", "9999999")//永久槍18價錢
-    register_cvar("fgun19_cost", "9999999")//永久槍19價錢
-    register_cvar("fgun20_cost", "9999999")//永久槍20價錢
+	// SQL Initionlize
+	new sql_host[64], sql_user[64], sql_pass[64], sql_db[64]
+	get_cvar_string("amx_sql_host", sql_host, 63)
+	get_cvar_string("amx_sql_user", sql_user, 63)
+	get_cvar_string("amx_sql_pass", sql_pass, 63)
+	get_cvar_string("amx_sql_db", sql_db, 63)
 
-    register_cvar("fhgun2_cost", "9999999")  //永久手槍2價錢
-    register_cvar("fhgun3_cost", "9999999")  //永久手槍3價錢
-    register_cvar("fhgun4_cost", "9999999")  //永久手槍4價錢
-    register_cvar("fhgun5_cost", "9999999")  //永久手槍5價錢
-    register_cvar("fhgun6_cost", "9999999")  //永久手槍6價錢
-    register_cvar("fhgun7_cost", "9999999")  //永久手槍7價錢
-    register_cvar("fhgun8_cost", "9999999")  //永久手槍8價錢
-    register_cvar("fhgun9_cost", "9999999")  //永久手槍9價錢
-    register_cvar("fhgun10_cost", "9999999")//永久手槍10價錢
+	sql = dbi_connect(sql_host, sql_user, sql_pass, sql_db, error, 32)
 
-    register_cvar("fthing3_cost", "9999999")//永久物品3價錢
-    register_cvar("fthing4_cost", "9999999")//永久物品4價錢
-    register_cvar("fthing5_cost", "9999999")//永久物品5價錢
-    
-    g_fvault = nvault_open("BB_Level_Shop_S1") 
+	if (sql == SQL_FAILED)
+	{
+		server_print("[FGunShop] Could not connect to SQL database. %s", error)
+	}
 }
 
 public plugin_natives()  //註冊獨有指令INC(這裡我只加了我5樣永久物品,有需要自行增加,用來防止按~指令拿槍)
@@ -129,27 +113,15 @@ public fshop_gun(id) //永久商城主槍械(己列出例子)
 {
 		new menu = menu_create("\r永久商城 - 永久枪", "fshop2_handler");
 				
-		menu_additem(menu, "\g[突击步枪]\y416-C Carbine     \g100 武器点", "1", 0);
-		menu_additem(menu, "\g[冲锋枪]\yKriss Super V     \g100 武器点", "2", 0);
-		menu_additem(menu, "不日推出", "3", 0);
-		menu_additem(menu, "不日推出", "4", 0);
-		menu_additem(menu, "不日推出", "5", 0);
-		menu_additem(menu, "不日推出", "6", 0);
-		menu_additem(menu, "不日推出", "7", 0);
-		menu_additem(menu, "不日推出", "8", 0);
-		menu_additem(menu, "不日推出", "9", 0);
-		menu_additem(menu, "不日推出", "10", 0);
-		menu_additem(menu, "不日推出", "11", 0);
-		menu_additem(menu, "不日推出", "12", 0);
-		menu_additem(menu, "不日推出", "13", 0);
-		menu_additem(menu, "不日推出", "14", 0);
-		menu_additem(menu, "不日推出", "15", 0);
-		menu_additem(menu, "不日推出", "16", 0);
-		menu_additem(menu, "不日推出", "17", 0);
-		menu_additem(menu, "不日推出", "18", 0);
-		menu_additem(menu, "不日推出", "19", 0);
-		menu_additem(menu, "不日推出^n", "20", 0);
-		menu_additem(menu, "返回", "21", 0);
+		new szTempid[32]
+		for(new i = 1; i < sizeof gun_code; i++)
+		{
+			new szItems[101]
+			//\g[突击步枪]\y416-C Carbine     \g100 武器点
+			formatex(szItems, 100, "\g%s\y%s     \g%d 武器点", gun_type[i], gun_name[i], gun_cost[i])
+			num_to_str(i, szTempid, 31)
+			menu_additem(menu, szItems, szTempid, 0)
+		}
 		
 		menu_setprop(menu, MPROP_NUMBER_COLOR, "\r"); 
 		menu_setprop(menu, MPROP_BACKNAME, "返回"); 
@@ -181,478 +153,41 @@ public fshop2_handler(id, menu, item)
 	
 	new key = str_to_num(data);
 
-	
-	switch(key)
+	if(key <= (sizeof gun_code - 1))
 	{
-		case 1:
-		{
-			 if (!g_xD0625_fgun1[id])
-			 {
-				if (get_user_gp(id) >= get_cvar_num("fgun1_cost"))
-				{
-					log_buy(id, 1)
-					g_xD0625_fgun1[id] = 1
-					set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun1_cost"))
-					client_printc(id, "\g[永久商城] \t你己购买了 \y416-C Carbine\t! 可到\y我的背包\t装备。")
-					client_print(id, print_console, "[FGUNSHOP] 你己購買了 416-C Carbine!可到 我的背包 装备。") 
-				}
-				else
-				{
-					client_printc(id, "\g[永久商城] \t你没有足够的\y 武器点 \t!!")
-					client_print(id, print_console, "[FGUNSHOP] 你沒有足夠的武器點!!") 
-				}
-			 }
-			 else
-			 {
-				client_printc(id, "\g[永久商城] \t你己拥有这把\y永久枪\t。")
-				client_print(id, print_console, "[FGUNSHOP] 你己擁有該把永久槍。") 
-			 }
-		}
-		case 2:
-		{
-		 if (!g_xD0625_fgun2[id])
-		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun2_cost"))
-			{
-				log_buy(id, 2)
-				g_xD0625_fgun2[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun2_cost"))
-				client_printc(id, "\g[永久商城] \t你己购买了 \yKriss Super V\t! 可到\y我的背包\t装备。")
-				client_print(id, print_console, "[FGUNSHOP] 你己購買了 Kriss Super V ! 可到 我的背包 装备。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\y武器點\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的武器點!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 3:
-		{
-		 if (!g_xD0625_fgun3[id])
-		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun3_cost"))
-			{
-				g_xD0625_fgun3[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun3_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 \y鐵血重炮 - M32\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 鐵血重炮 - M32!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\y武器點\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的武器點!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 4:
-		{
-		 if (!g_xD0625_fgun4[id])
-		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun4_cost"))
-			{
-				g_xD0625_fgun4[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun4_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 \y神器-幽能離子槍\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 神器 - 幽能離子槍!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\y武器點\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的武器點!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 5:
-		{
-		 if (!g_xD0625_fgun5[id])
-		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun5_cost"))
-			{
-				g_xD0625_fgun5[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun5_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 \y超神器 * Thanatos-5\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 超神器*Thanatos-5!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\y武器點\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的武器點!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 6:
-		{
-		 if (!g_xD0625_fgun6[id])
-		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun6_cost"))
-			{
-				g_xD0625_fgun6[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun6_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 \y超神器 * Thanatos-7\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 超神器*Thanatos-7!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\y武器點\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的武器點!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 7:
-		{
-		 if (!g_xD0625_fgun7[id])
-		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun7_cost"))
-			{
-				g_xD0625_fgun7[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun7_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 \y焚盡者<特別版>\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 焚燼者<特別版>!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\y武器點\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的武器點!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 8:
-		{
-		 if (!g_xD0625_fgun8[id])
-		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun8_cost"))
-			{
-				g_xD0625_fgun8[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun8_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 \y超神器 * 英雄戰擊\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 超神器 * 英雄戰擊!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\y武器點\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的武器點!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 9:
-		{
-		 if (!g_xD0625_fgun9[id])
-		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun9_cost"))
-			{
-				g_xD0625_fgun9[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun9_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 \b聖器-ThunderBoltEX\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 聖器-ThunderBoltEX!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\y武器點\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的武器點!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 10:
-		{
-		 if (!g_xD0625_fgun10[id])
-		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun10_cost"))
-			{
-				g_xD0625_fgun10[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun10_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 \y致命雙刺-DualKriss\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 致命雙刺-DualKriss!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\y武器點\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的武器點!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 11:
-		{
-		 if (!g_xD0625_fgun11[id])
-		 {
-			if (get_user_gp(id) >= get_cvar_num("fgun11_cost"))
-			{
-				g_xD0625_fgun11[id] = 1
-				set_user_gp(id, get_user_gp(id) - get_cvar_num("fgun11_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 \yAT4CS火箭發射器\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 AT4CS火箭發射器!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\y武器點\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的武器點!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 12:
-		{
-		 if (!g_xD0625_fgun12[id])
-		 {
-			if (get_user_cash(id) >= get_cvar_num("fgun12_cost"))
-			{
-				g_xD0625_fgun12[id] = 1
-				set_user_cash(id, get_user_cash(id) - get_cvar_num("fgun12_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 永久槍 - \y-------\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 永久槍 - -------!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\yCash\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的Cash!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 13:
-		{
-		 if (!g_xD0625_fgun13[id])
-		 {
-			if (get_user_cash(id) >= get_cvar_num("fgun13_cost"))
-			{
-				g_xD0625_fgun13[id] = 1
-				set_user_cash(id, get_user_cash(id) - get_cvar_num("fgun13_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 永久槍 - \y-------\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 永久槍 - -------!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\yCash\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的Cash!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 14:
-		{
-		 if (!g_xD0625_fgun14[id])
-		 {
-			if (get_user_cash(id) >= get_cvar_num("fgun14_cost"))
-			{
-				g_xD0625_fgun14[id] = 1
-				set_user_cash(id, get_user_cash(id) - get_cvar_num("fgun14_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 永久槍 - \y-------\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 永久槍 - -------!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\yCash\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的Cash!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 15:
-		{
-		 if (!g_xD0625_fgun15[id])
-		 {
-			if (get_user_cash(id) >= get_cvar_num("fgun15_cost"))
-			{
-				g_xD0625_fgun15[id] = 1
-				set_user_cash(id, get_user_cash(id) - get_cvar_num("fgun15_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 永久槍 - \y-------\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 永久槍 - -------!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\yCash\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的Cash!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 16:
-		{
-		 if (!g_xD0625_fgun16[id])
-		 {
-			if (get_user_cash(id) >= get_cvar_num("fgun16_cost"))
-			{
-				g_xD0625_fgun16[id] = 1
-				set_user_cash(id, get_user_cash(id) - get_cvar_num("fgun16_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 永久槍 - \y-------\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 永久槍 - -------!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\yCash\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的Cash!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 17:
-		{
-		 if (!g_xD0625_fgun17[id])
-		 {
-			if (get_user_cash(id) >= get_cvar_num("fgun17_cost"))
-			{
-				g_xD0625_fgun17[id] = 1
-				set_user_cash(id, get_user_cash(id) - get_cvar_num("fgun17_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 永久槍 - \y-------\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 永久槍 - -------!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\yCash\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的Cash!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 18:
-		{
-		 if (!g_xD0625_fgun18[id])
-		 {
-			if (get_user_cash(id) >= get_cvar_num("fgun18_cost"))
-			{
-				g_xD0625_fgun18[id] = 1
-				set_user_cash(id, get_user_cash(id) - get_cvar_num("fgun18_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 永久槍 - \y-------\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 永久槍 - -------!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\yCash\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的Cash!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 19:
-		{
-		 if (!g_xD0625_fgun19[id])
-		 {
-			if (get_user_cash(id) >= get_cvar_num("fgun19_cost"))
-			{
-				g_xD0625_fgun19[id] = 1
-				set_user_cash(id, get_user_cash(id) - get_cvar_num("fgun19_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 永久槍 - \y-------\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 永久槍 - -------!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\yCash\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的Cash!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 20:
-		{
-		 if (!g_xD0625_fgun20[id])
-		 {
-			if (get_user_cash(id) >= get_cvar_num("fgun20_cost"))
-			{
-				g_xD0625_fgun20[id] = 1
-				set_user_cash(id, get_user_cash(id) - get_cvar_num("fgun20_cost"))
-				client_printc(id, "\g[永久商城] \t你己購買了 永久槍 - \y-------\t! 可到\y我的背包\t裝備。")
-				client_print(id, print_console, "[BossLevelS] 你己購買了 永久槍 - -------!可到 我的背包 裝備。") 
-			}
-			else
-			{
-				client_printc(id, "\g[永久商城] \t你沒有足夠的\yCash\t!!")
-				client_print(id, print_console, "[BossLevelS] 你沒有足夠的Cash!!") 
-			}
-		 }
-		 else
-		 {
-			client_printc(id, "\g[永久商城] \t你己擁有該把\y永久槍\t。")
-			client_print(id, print_console, "[BossLevelS] 你己擁有該把永久槍。") 
-		 }
-		}
-		case 21:
-		{
-                        client_cmd(id, "fshopmenu")
-		}
+		BuyFgun(id, key)
 	}
-	menu_destroy(menu);
-	return PLUGIN_HANDLED;
+	else 
+	{
+		menu_destroy(menu);
+		return PLUGIN_HANDLED;
+	}
+}
+
+public BuyFgun(id, wpnid)
+{
+	 if (!g_iForeverGun[id][wpnid])
+	 {
+		if (get_user_gp(id) >= gun_cost[wpnid])
+		{
+			log_buy(id, 1)
+			g_iForeverGun[id][wpnid] = 1
+			set_user_gp(id, get_user_gp(id) - gun_cost[wpnid])
+			client_printc(id, "\g[永久商城] \t你己购买了 \y%s\t! 可到\y我的背包\t装备。", gun_name[wpnid])
+			client_print(id, print_console, "[FGUNSHOP] 你己購買了 %s !可到 我的背包 装备。", gun_name[wpnid]) 
+		}
+		else
+		{
+			client_printc(id, "\g[永久商城] \t你没有足够的\y 武器点 \t!!")
+			client_print(id, print_console, "[FGUNSHOP] 你沒有足夠的武器點!!") 
+		}
+	 }
+	 else
+	 {
+		client_printc(id, "\g[永久商城] \t你己拥有这把\y永久枪\t。")
+		client_print(id, print_console, "[FGUNSHOP] 你己擁有該把永久槍。") 
+	 }
+
 }
 
 public fshop_handgun(id)//永久商城副槍械(己列出例子)
@@ -1064,228 +599,18 @@ public myfg_menu(id)//裝備永久槍(己列出例子)
 
 	static menu, option[64]
 	
+	// 416-C Carbine     \r　: \y　己购买
 	menu = menu_create("\r裝備永久槍", "my2_handler")
-	if (g_xD0625_fgun1[id])
+	new szTempid[32]
+	for(new i = 1; i < sizeof gun_code; i++)
 	{
-		formatex(option, charsmax(option), "416-C Carbine     \r　: \y　己购买")
-		menu_additem(menu, option, "1", 0)
+		new iSkin = g_iForeverGun[id][i]
 		
+		new szItems[101]
+		formatex(szItems, 100, "%s     \r　: 　\y%s", gun_name[i], is_bought_gun[iSkin])
+		num_to_str(i, szTempid, 31)
+		menu_additem(menu, szItems, szTempid, 0)
 	}
-	else
-	{
-		formatex(option, charsmax(option), "416-C Carbine     \y　: \r　未购买")
-		menu_additem(menu, option, "1", 0)	
-	}
-	if (g_xD0625_fgun2[id])
-	{
-		formatex(option, charsmax(option), "Kriss Super V  \r　: \y　己购买")
-		menu_additem(menu, option, "2", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "Kriss Super V  \y　: \r　未购买")
-		menu_additem(menu, option, "2", 0)	
-	}
-	if (g_xD0625_fgun3[id])
-	{
-		formatex(option, charsmax(option), "-------   \r　: \y　己購買")
-		menu_additem(menu, option, "3", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------   \y　: \r　未購買")
-		menu_additem(menu, option, "3", 0)	
-	}
-	if (g_xD0625_fgun4[id])
-	{
-		formatex(option, charsmax(option), "-------   \r　: \y　己購買")
-		menu_additem(menu, option, "4", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------   \y　: \r　未購買")
-		menu_additem(menu, option, "4", 0)	
-	}
-	if (g_xD0625_fgun5[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買")
-		menu_additem(menu, option, "5", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------   \y　: \r　未購買")
-		menu_additem(menu, option, "5", 0)	
-	}
-	if (g_xD0625_fgun6[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買")
-		menu_additem(menu, option, "6", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------   \y　: \r　未購買")
-		menu_additem(menu, option, "6", 0)	
-	}
-	if (g_xD0625_fgun7[id])
-	{
-		formatex(option, charsmax(option), "-------   \r　: \y　己購買")
-		menu_additem(menu, option, "7", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------   \y　: \r　未購買")
-		menu_additem(menu, option, "7", 0)	
-	}
-	if (g_xD0625_fgun8[id])
-	{
-		formatex(option, charsmax(option), "-------   \r　: \y　己購買")
-		menu_additem(menu, option, "8", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------   \y　: \r　未購買")
-		menu_additem(menu, option, "8", 0)	
-	}
-	if (g_xD0625_fgun9[id])
-	{
-		formatex(option, charsmax(option), "-------   \r　: \y　己購買")
-		menu_additem(menu, option, "9", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------   \y　: \r　未購買")
-		menu_additem(menu, option, "9", 0)	
-	}
-	if (g_xD0625_fgun10[id])
-	{
-		formatex(option, charsmax(option), "-------   \r　: \y　己購買")
-		menu_additem(menu, option, "10", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------   \y　: \r　未購買")
-		menu_additem(menu, option, "10", 0)	
-	}
-	if (g_xD0625_fgun11[id])
-	{
-		formatex(option, charsmax(option), "-------   \r　: \y　己購買")
-		menu_additem(menu, option, "11", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------   \y　: \r　未購買")
-		menu_additem(menu, option, "11", 0)	
-	}
-	if (g_xD0625_fgun12[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買")
-		menu_additem(menu, option, "12", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------  \y　: \r　未購買")
-		menu_additem(menu, option, "12", 0)	
-	}
-	if (g_xD0625_fgun13[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買")
-		menu_additem(menu, option, "13", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------  \y　: \r　未購買")
-		menu_additem(menu, option, "13", 0)	
-	}
-	if (g_xD0625_fgun14[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買")
-		menu_additem(menu, option, "14", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------  \y　: \r　未購買")
-		menu_additem(menu, option, "14", 0)	
-	}
-	if (g_xD0625_fgun15[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買")
-		menu_additem(menu, option, "15", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------  \y　: \r　未購買")
-		menu_additem(menu, option, "15", 0)	
-	}
-	if (g_xD0625_fgun16[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買")
-		menu_additem(menu, option, "16", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------  \y　: \r　未購買")
-		menu_additem(menu, option, "16", 0)	
-	}
-	if (g_xD0625_fgun17[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買")
-		menu_additem(menu, option, "17", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------  \y　: \r　未購買")
-		menu_additem(menu, option, "17", 0)	
-	}
-	if (g_xD0625_fgun18[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買")
-		menu_additem(menu, option, "18", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------  \y　: \r　未購買")
-		menu_additem(menu, option, "18", 0)	
-	}
-	if (g_xD0625_fgun19[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買")
-		menu_additem(menu, option, "19", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------  \y　: \r　未購買")
-		menu_additem(menu, option, "19", 0)	
-	}
-	if (g_xD0625_fgun20[id])
-	{
-		formatex(option, charsmax(option), "-------  \r　: \y　己購買^n")
-		menu_additem(menu, option, "20", 0)
-		
-	}
-	else
-	{
-		formatex(option, charsmax(option), "-------  \y　: \r　未購買^n")
-		menu_additem(menu, option, "20", 0)	
-	}
-	menu_additem(menu, "返回", "21", 0);
 	
 	menu_setprop(menu, MPROP_NUMBER_COLOR, "\r"); 
 	menu_setprop(menu, MPROP_BACKNAME, "返回"); 
@@ -1320,12 +645,24 @@ public my2_handler(id, menu, item)
 	
 	new key = str_to_num(data);
 
-	
-	switch(key)
+	if(key <= (sizeof gun_code - 1))
+	{
+		EquipFGun(id, key)
+	}
+	else 
+	{
+		menu_destroy(menu);
+		return PLUGIN_HANDLED;
+	}
+}
+
+public EquipFGun(id, wpnid)
+{
+	switch(wpnid)
 	{
 		case 1:
 		{
-			if (g_xD0625_fgun1[id])
+			if (g_iForeverGun[id][1])
 			{
 				client_printc(id, "\g[枪械选择] \t你装备了 \y416-C Carbine\t !")
 				client_cmd(id, DEF_HK416_CODE)
@@ -1339,7 +676,7 @@ public my2_handler(id, menu, item)
 		}
 		case 2:
 		{
-			if (g_xD0625_fgun2[id])
+			if (g_iForeverGun[id][2])
 			{
 				client_printc(id, "\g[枪械选择] \t你装备了 \yKriss Super V\t !")
 				client_cmd(id, DEF_KRISS_CODE)
@@ -1351,275 +688,7 @@ public my2_handler(id, menu, item)
 				client_printc(id, "\g[枪械选择] \t请先到\y 永久商城 \t购买 !!")
 			}
 		}
-		case 3:
-		{
-		if (g_xD0625_fgun3[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 \y鐵血重炮-M32\t!")
-	    		client_cmd(id, "gaygunm32lun9gun")
-	    		client_cmd(id, "clear")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 4:
-		{
-		if (g_xD0625_fgun4[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 \y神器-幽能離子槍\t!")
-	    		client_cmd(id, "use_plasma")
-	    		client_cmd(id, "clear")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 5:
-		{
-		if (g_xD0625_fgun5[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 \y超神器*Thanatos-5\t!")
-	    		client_cmd(id, "Thanatos-5_sLolitaSGodGun")
-	    		client_cmd(id, "clear")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 6:
-		{
-		if (g_xD0625_fgun6[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 \y超神器*Thanatos-7\t!")
-	    		client_cmd(id, "Thanatos-7_sLolitaSGodGun")
-	    		client_cmd(id, "clear")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 7:
-		{
-		if (g_xD0625_fgun7[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 \y焚燼者<特別版>\t!")
-	    		client_cmd(id, "PoisonGunSoSadBoss99")
-	    		client_cmd(id, "clear")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 8:
-		{
-		if (g_xD0625_fgun8[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 \y超神器-英雄戰擊\t!")
-			client_printc(id, "\g[槍械選擇] \t本武器目前為預售階段.日後開放選擇!")
-	    		client_cmd(id, "SVDEXLDGUNaa")
-	    		client_cmd(id, "clear")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 9:
-		{
-		if (g_xD0625_fgun9[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 \b聖器-ThunderBoltEX\t!")
-	    		client_cmd(id, "sfsniperex")
-	    		client_cmd(id, "clear")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 10:
-		{
-		if (g_xD0625_fgun10[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 \y致命雙刺-DualKriss\t!")
-	    		client_cmd(id, "DualKrissVictor")
-	    		client_cmd(id, "clear")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 11:
-		{
-		if (g_xD0625_fgun11[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 \yAT4CS火箭發射器\t!")
-	    		client_cmd(id, "AT4CSMISSILELAUNCHER")
-	    		client_cmd(id, "clear")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 12:
-		{
-		if (g_xD0625_fgun12[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 永久槍 - \y-----\t!")
-	    		client_cmd(id, "")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 13:
-		{
-		if (g_xD0625_fgun13[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 永久槍 - \y-----\t!")
-	    		client_cmd(id, "")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 14:
-		{
-		if (g_xD0625_fgun14[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 永久槍 - \y-----\t!")
-	    		client_cmd(id, "")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 15:
-		{
-		if (g_xD0625_fgun15[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 永久槍 - \y-----\t!")
-	    		client_cmd(id, "")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 16:
-		{
-		if (g_xD0625_fgun16[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 永久槍 - \y-----\t!")
-	    		client_cmd(id, "")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 17:
-		{
-		if (g_xD0625_fgun17[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 永久槍 - \y-----\t!")
-	    		client_cmd(id, "")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 18:
-		{
-		if (g_xD0625_fgun18[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 永久槍 - \y-----\t!")
-	    		client_cmd(id, "")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 19:
-		{
-		if (g_xD0625_fgun19[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 永久槍 - \y-----\t!")
-	    		client_cmd(id, "")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 20:
-		{
-		if (g_xD0625_fgun20[id])
-		{
-			client_printc(id, "\g[槍械選擇] \t你裝備了 永久槍 - \y-----\t!")
-	    		client_cmd(id, "")
-	    		myfg_menu(id)
-		}
-		else
-		{
-			client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
-			client_printc(id, "\g[槍械選擇] \t請先到\y永久商城\t購買!!!!")
-		}
-		}
-		case 21:
-		{
-                        client_cmd(id, "mymenu")
-		}
 	}
-	menu_destroy(menu);
-	return PLUGIN_HANDLED;
 }
 
 public myfhg_menu(id)//裝備永久手槍(己列出例子)
@@ -2144,117 +1213,6 @@ public vip_handler(id, menu, item)
 	return PLUGIN_HANDLED;
 }
 
-
-public native_get_user_fgun1(id)  //永久槍1
-{
-    return g_xD0625_fgun1[id]
-}
-
-public native_set_user_fgun1(id, amount)  //永久槍1
-{
-    g_xD0625_fgun1[id] = amount
-    return g_xD0625_fgun1[id]
-}
-
-public native_get_user_fgun2(id)  //永久槍2
-{
-    return g_xD0625_fgun2[id]
-}
-
-public native_set_user_fgun2(id, amount)  //永久槍2
-{
-    g_xD0625_fgun2[id] = amount
-    return g_xD0625_fgun2[id]
-}
-
-public native_get_user_fgun3(id)
-{
-     return g_xD0625_fgun3[id]
-}
-
-public native_set_user_fgun3(id, amount)
-{
-     g_xD0625_fgun3[id] = amount
-     return g_xD0625_fgun3[id]
-}
-
-public native_get_user_fgun4(id)
-{
-     return g_xD0625_fgun4[id]
-}
-
-public native_set_user_fgun4(id, amount)
-{
-     g_xD0625_fgun4[id] = amount
-     return g_xD0625_fgun4[id]
-}
-
-public native_get_user_fgun5(id)
-{
-     return g_xD0625_fgun5[id]
-}
-
-public native_set_user_fgun5(id, amount)
-{
-     g_xD0625_fgun5[id] = amount
-     return g_xD0625_fgun5[id]
-}
-
-public native_get_user_fgun6(id)
-{
-     return g_xD0625_fgun6[id]
-}
-
-public native_set_user_fgun6(id, amount)
-{
-     g_xD0625_fgun6[id] = amount
-     return g_xD0625_fgun6[id]
-}
-
-public native_get_user_fgun7(id)
-{
-     return g_xD0625_fgun7[id]
-}
-
-public native_set_user_fgun7(id, amount)
-{
-     g_xD0625_fgun7[id] = amount
-     return g_xD0625_fgun7[id]
-}
-
-public native_get_user_fgun8(id)
-{
-     return g_xD0625_fgun8[id]
-}
-
-public native_set_user_fgun8(id, amount)
-{
-     g_xD0625_fgun8[id] = amount
-     return g_xD0625_fgun8[id]
-}
-
-public native_get_user_fgun9(id)
-{
-     return g_xD0625_fgun9[id]
-}
-
-public native_set_user_fgun9(id, amount)
-{
-     g_xD0625_fgun9[id] = amount
-     return g_xD0625_fgun9[id]
-}
-
-public native_get_user_fgun10(id)
-{
-     return g_xD0625_fgun10[id]
-}
-
-public native_set_user_fgun10(id, amount)
-{
-     g_xD0625_fgun10[id] = amount
-     return g_xD0625_fgun10[id]
-}
-
 public native_get_user_fhgun1(id)  //永久手槍1
 {
     return g_xD0625_fhgun1[id]
@@ -2330,10 +1288,19 @@ public client_disconnect(id)
 {
  SaveDatafgun(id)
  g_iSelectPri[id] = 0
+ 
+		for(new i=1;i<sizeof gun_code;i++)
+		{
+			g_iForeverGun[id][i] = 0
+		}
 }
 
 public client_putinserver(id)
 {
+		for(new i=1;i<sizeof gun_code;i++)
+		{
+			g_iForeverGun[id][i] = 0
+		}
  LoadDatafgun(id)
  g_iSelectPri[id] = 0
 }
@@ -2345,6 +1312,7 @@ public saveguns(id)
 
 public SaveDatafgun(id) //儲存永久物品資料
 { 
+/*
   new name[35], fvaultkey[64], fvaultdata[256]
               
   get_user_name(id, name, 34) 
@@ -2360,12 +1328,24 @@ public SaveDatafgun(id) //儲存永久物品資料
   g_xD0625_ftg1[id], g_xD0625_ftg2[id], g_xD0625_ftg3[id], g_xD0625_ftg4[id], g_xD0625_ftg5[id])
 
   nvault_set(g_fvault, fvaultkey, fvaultdata) 
+*/
 
-  return PLUGIN_CONTINUE
+	new authid[32]
+	get_user_name(id, authid, 31)
+	replace_all(authid, 32, "`", "\`")
+	replace_all(authid, 32, "'", "\'")
+	
+	for(new i=1;i<sizeof gun_code;i++)
+	{
+		dbi_query(sql, "UPDATE bb_weapons SET %s='%d' WHERE name = '%s'", gun_code[i], g_iForeverGun[id][i], authid)
+	}
+	
+	return PLUGIN_CONTINUE
 } 
 
 public LoadDatafgun(id) //載入永久物品資料
 { 
+/*
   new name[35], fvaultkey[64], fvaultdata[256]
   get_user_name(id,name,34) 
              
@@ -2440,6 +1420,31 @@ public LoadDatafgun(id) //載入永久物品資料
   g_xD0625_ftg5[id] = str_to_num(player_ftg5)
 
   return PLUGIN_CONTINUE
+  */
+  
+	new authid[32] 
+	get_user_name(id,authid,31)
+	replace_all(authid, 32, "`", "\`")
+	replace_all(authid, 32, "'", "\'")
+
+	result = dbi_query(sql, "SELECT hk416,kriss FROM bb_weapons WHERE name='%s'", authid)
+
+	if(result == RESULT_NONE)
+	{
+	dbi_query(sql, "INSERT INTO bb_weapons(name,hk416,kriss) VALUES('%s','0','0')", authid)
+	}
+	else if(result <= RESULT_FAILED)
+	{
+		server_print("[FGunShop] SQL Init error. (Load)")
+	}
+	else
+	{
+		for(new i=1;i<sizeof gun_code;i++)
+		{
+			g_iForeverGun[id][i] = dbi_field(result, i)
+		}
+		dbi_free_result(result)
+	}
 }
 
 stock client_printc(const id, const string[], {Float, Sql, Resul,_}:...)
