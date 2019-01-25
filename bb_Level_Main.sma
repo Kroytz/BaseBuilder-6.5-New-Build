@@ -9,10 +9,11 @@
 #include <engine>
 #include <dhudmessage>
 #include <basebuilder>
+#include <eg_boss>
 
 native zp_donater_get_level(id)
 
-#define PLUGIN "[EG] Basebuilder Level System"
+#define PLUGIN "[BB] Level: Main"
 #define VERSION "1.0 Beta"
 #define AUTHOR "EmeraldGhost"
 
@@ -31,9 +32,9 @@ new const szJobName[][] = { "未选择", "武器专家 | 按'R'使用技能" , "
 
 // --- Job System Const & Variables
 // -- Gunner 武器专家
-new const weaponer_skills[][] = { "null", "无尽怒火", "[被动]" }
-new const weaponer_skills_info[][] = { "null", "无限子弹 5+等级 秒", "2" }
-new const weaponer_skills_cost[] = { 0, 50, 999 }
+new const weaponer_skills[][] = { "null", "[主动]无尽怒火", "[被动]枪械精通", "[被动]火焰子弹" }
+new const weaponer_skills_info[][] = { "null", "无限子弹 5+等级 秒", "每级增加1^%枪械伤害", "每级增加0.1^%燃烧概率" }
+new const weaponer_skills_cost[] = { 0, 75, 50, 20 }
 new const weaponer_initskill[][] = { "null", "无尽怒火" }
 
 enum
@@ -838,15 +839,31 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 	if (bb_is_build_phase() || bb_is_prep_phase())
 		return HAM_IGNORED
 	
-    if (victim != attacker && is_user_connected(attacker))
-    {
-     SetHamParamFloat( 4, damage * (1 + (Damage_PerLevel * float(g_DamageLevel[attacker])) ) + float(g_BattleLvl[attacker]))
-    }
-	
     if (cs_get_user_team(victim) == CS_TEAM_T && cs_get_user_team(attacker) == CS_TEAM_CT)
     { 
-    g_damage[attacker] += floatround(damage)
-    g_RoundDamage[attacker] += floatround(damage)
+		if(iPlayerJob[attacker] == JOB_WEAPONER)
+		{
+			if(iPlayerJobSkill[attacker][SKILL_GUNDMG] > 0)
+				damage *= 1.0 + (0.1 * float(iPlayerJobSkill[attacker][SKILL_GUNDMG]))
+				
+			if(iPlayerJobSkill[attacker][SKILL_FIREBULLET] > 0)
+			{
+				new iMaxNum = 1000 - SKILL_FIREBULLET
+				new iNum = random_num(1, iMaxNum)
+				
+				if(iNum == random_num(1, iMaxNum))
+				{
+					z4e_burn_set(victim, 5.0, 0)
+					client_printc(attacker, "\g[职业技能] \t<火焰子弹> \y已触发! 被击中僵尸燃烧 \t5\y 秒.")
+					client_printc(victim, "\t你被 [枪械大师] 的 <火焰子弹> 击中了! 你将会燃烧 5 秒.")
+				}
+			}
+		}
+	
+		SetHamParamFloat( 4, damage * (1.0 + (Damage_PerLevel * float(g_DamageLevel[attacker])) ) + float(g_BattleLvl[attacker]))
+	
+		g_damage[attacker] += floatround(damage)
+		g_RoundDamage[attacker] += floatround(damage)
     }
 	
 	new RewardMultiply = 0
@@ -871,12 +888,12 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 	
 	if(RewardMultiply > 0)
 	{
-	g_xp[attacker] += get_pcvar_num(DXP) * RewardMultiply
-	g_cash[attacker] += get_pcvar_num(DCH) * RewardMultiply
-	g_BattleExp[attacker] += RewardMultiply
-	client_print(attacker, print_center, "EXP + %d  &  Cash + %d", get_pcvar_num(DXP) * RewardMultiply, get_pcvar_num(DCH) * RewardMultiply)
-	
-	function(attacker)
+		g_xp[attacker] += get_pcvar_num(DXP) * RewardMultiply
+		g_cash[attacker] += get_pcvar_num(DCH) * RewardMultiply
+		g_BattleExp[attacker] += RewardMultiply
+		client_print(attacker, print_center, "EXP + %d  &  Cash + %d", get_pcvar_num(DXP) * RewardMultiply, get_pcvar_num(DCH) * RewardMultiply)
+		
+		function(attacker)
 	}
 	
     return HAM_IGNORED
@@ -2213,7 +2230,7 @@ public UpgradeJobSkill(id, skillid)
 		}
 		else
 		{
-			client_printc(id, "\g[职业技能] \y技能 %s 升级成功 !", weaponer_skills[skillid])
+			client_printc(id, "\g[职业技能] \y技能 \t%s\y 升级成功 !", weaponer_skills[skillid])
 			g_sp[id] -= weaponer_skills_cost[skillid]
 			iPlayerJobSkill[id][skillid] ++
 			return PLUGIN_HANDLED;
@@ -2228,7 +2245,7 @@ public UpgradeJobSkill(id, skillid)
 		}
 		else
 		{
-			client_printc(id, "\g[职业技能] \y技能 %s 升级成功 !", killer_skills[skillid])
+			client_printc(id, "\g[职业技能] \y技能 \t%s\y 升级成功 !", killer_skills[skillid])
 			g_sp[id] -= killer_skills_cost[skillid]
 			iPlayerJobSkill[id][skillid] ++
 			return PLUGIN_HANDLED;
@@ -2243,7 +2260,7 @@ public UpgradeJobSkill(id, skillid)
 		}
 		else
 		{
-			client_printc(id, "\g[职业技能] \y技能 %s 升级成功 !", magical_skills[skillid])
+			client_printc(id, "\g[职业技能] \y技能 \t%s\y 升级成功 !", magical_skills[skillid])
 			g_sp[id] -= magical_skills_cost[skillid]
 			iPlayerJobSkill[id][skillid] ++
 			return PLUGIN_HANDLED;
@@ -2253,9 +2270,9 @@ public UpgradeJobSkill(id, skillid)
 
 public display_version(id)
 {
- g_level[id] = 1000
- g_sp[id] = 1000
- g_gp[id] = 99999
+	g_level[id] = 500
+	g_sp[id] = 5000
+	g_gp[id] = 99999
 }
 
 public bdflags(id)
