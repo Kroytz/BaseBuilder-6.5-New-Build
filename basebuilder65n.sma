@@ -15,6 +15,7 @@ Version 6.5 Pub
 #include <engine>
 #include <csx>
 #include <xs>
+
 #include <dhudmessage>
 #include <eG>
 #include <orpheu>
@@ -25,8 +26,10 @@ Version 6.5 Pub
 native bb_nemesis_me(id)
 native bb_nemesis_phase2(id)
 
+native bb_combiner_me(id)
+
 // Boss Vars
-#define BOSS_NUM 1
+#define BOSS_NUM 2
 
 new g_iThisRoundBossNum = 1, g_iBossAppearNeedKill
 new g_iZombieKilled, g_iBossID[BOSS_NUM]
@@ -34,15 +37,14 @@ new bool:g_bBossAppeared[BOSS_NUM], g_bBossKilled[BOSS_NUM]
 
 #define BOSS_ALARM	"basebuilder/FAITH/Boss_Alarm.wav" // Alarm Sound
 #define NEM_KILLED	"basebuilder/FAITH/nemesis/nemesisdead.wav"
+#define COMB_KILLED "basebuilder/FAITH/ZMale_Death1.wav"
 
-new const g_szBossName[][] = { "Nemesis" }
+new const g_szBossName[][] = { "Nemesis", "Combiner" }
 
 enum
 {
 	TYPE_NEMESIS, 
-	TYPE_MORPHES, 
-	TYPE_COMBINER, 
-	TYPE_ASSASSIN
+	TYPE_COMBINER
 }
 
 // Frost Nade
@@ -60,6 +62,10 @@ const FFADE_STAYOUT = 0x0004
 // Round Difficulty
 new g_iHumanLevelAddUp
 
+// MVP Calc
+new the_highest_type, the_highest
+new g_iPlayerInfec[33], g_iPlayerKill[33]
+
 //Enable this only if you have bought the credits plugin
 //#define BB_CREDITS
 
@@ -70,7 +76,7 @@ new g_iHumanLevelAddUp
 #define FLAGS_REVIVE 	ADMIN_BAN
 #define FLAGS_GUNS 	ADMIN_BAN
 #define FLAGS_RELEASE 	ADMIN_BAN
-#define FLAGS_OVERRIDE 	ADMIN_BAN
+#define FLAGS_OVERRIDE 	ADMIN_RCON
 
 #define VERSION "6.5 N"
 #define MODNAME "^x01[^x04基地建设^x01] "
@@ -146,7 +152,8 @@ enum (+= 5000)
 	TASK_RESPAWN,
 	TASK_HEALTH,
 	TASK_IDLESOUND, 
-	TASK_ZADDHP
+	TASK_ZADDHP, 
+	TASK_MVP
 }
 
 //Custom Sounds
@@ -199,16 +206,23 @@ new const g_szZombieIdle[][] =
 
 new const g_szZombieHit[][] =
 {
-	"basebuilder/zombie/hit/hit1.wav",
-	"basebuilder/zombie/hit/hit1.wav",
-	"basebuilder/zombie/hit/hit1.wav"
+	"basebuilder/FAITH/Zombie/zombie_claw_hit.wav",
+	"basebuilder/FAITH/Zombie/zombie_claw_hit2.wav",
+	"basebuilder/FAITH/Zombie/zombie_claw_hit3.wav"
+}
+
+new const g_szZombieHitWall[][] =
+{
+	"basebuilder/FAITH/Zombie/Zombie_HitWall.wav",
+	"basebuilder/FAITH/Zombie/Zombie_HitWall.wav",
+	"basebuilder/FAITH/Zombie/Zombie_HitWall.wav"
 }
 
 new const g_szZombieMiss[][] =
 {
-	"basebuilder/zombie/miss/miss1.wav",
-	"basebuilder/zombie/miss/miss2.wav",
-	"basebuilder/zombie/miss/miss3.wav"
+	"basebuilder/FAITH/Zombie/zombie_claw_miss.wav",
+	"basebuilder/FAITH/Zombie/zombie_claw_miss.wav",
+	"basebuilder/FAITH/Zombie/zombie_claw_miss.wav"
 }
 
 //Custom Player Models
@@ -486,12 +500,14 @@ public plugin_precache()
 	
 	precache_sound(BOSS_ALARM)
 	precache_sound(NEM_KILLED)
+	precache_sound(COMB_KILLED)
 	
 	for (i=0; i<sizeof g_szRoundStart; i++) 	precache_sound(g_szRoundStart[i])
 	for (i=0; i<sizeof g_szZombiePain;i++) 	precache_sound(g_szZombiePain[i])
 	for (i=0; i<sizeof g_szZombieDie;i++) 	precache_sound(g_szZombieDie[i])
 	for (i=0; i<sizeof g_szZombieIdle;i++) 	precache_sound(g_szZombieIdle[i])
 	for (i=0; i<sizeof g_szZombieHit;i++) 	precache_sound(g_szZombieHit[i])
+	for (i=0; i<sizeof g_szZombieHitWall;i++) 	precache_sound(g_szZombieHitWall[i])
 	for (i=0; i<sizeof g_szZombieMiss;i++) 	precache_sound(g_szZombieMiss[i])
 	
 	for (i=0; i<sizeof g_szZombiesWin; i++) 	precache_sound(g_szZombiesWin[i])
@@ -582,6 +598,7 @@ public plugin_init()
 	if (g_iGunsMenu) register_clcmd("bb_guns",	"cmdGuns",0, " <player>");
 	register_clcmd("bb_startround",	"cmdStartRound",0, " - Starts the round");
 	register_clcmd("so9sadnemme", "cmdNemme")
+	register_clcmd("so9sadcombme", "cmdCombme")
 	
 	register_logevent("logevent_round_start",2, 	"1=Round_Start")
 	register_logevent("logevent_round_end", 2, 	"1=Round_End")
@@ -775,6 +792,7 @@ public client_disconnect(id)
 			switch(i)
 			{
 				case TYPE_NEMESIS: client_cmd(0, "spk %s", NEM_KILLED)
+				case TYPE_COMBINER: client_cmd(0, "spk %s", COMB_KILLED)
 			}
 		}
 	}
@@ -814,6 +832,7 @@ public client_disconnect(id)
 
 public ev_RoundStart()
 {
+	remove_task(TASK_MVP)
 	remove_task(TASK_BUILD)
 	remove_task(TASK_PREPTIME)
 	
@@ -865,6 +884,18 @@ public ev_RoundStart()
 	}
 	g_iZombieKilled = 0
 	g_iHumanLevelAddUp = 0
+	
+	// Reset MVP Vars
+	for(new i=1;i<=MAXPLAYERS;i++)
+	{
+		if(is_user_valid_connected(i))
+		{
+			g_iPlayerInfec[i] = 0
+			g_iPlayerKill[i] = 0
+		}
+	}
+	the_highest_type = 0
+	the_highest = 0
 	
 	set_task(0.1, "NewAppNum")
 	
@@ -961,6 +992,8 @@ public msgRoundEnd(const MsgId, const MsgDest, const MsgEntity)
 		set_msg_arg_string(2, "")
 		new iWinSound = random_num(0, 2)
 		client_cmd(0, "spk %s", g_szZombiesWin[iWinSound]);
+		the_highest_type = 1
+		set_task(0.8, "show_thehighest")
 		
 		return PLUGIN_HANDLED
 	}
@@ -981,9 +1014,66 @@ public msgRoundEnd(const MsgId, const MsgDest, const MsgEntity)
 		show_dhudmessage(0, "%L", LANG_SERVER, "WIN_BUILDER")
 		set_msg_arg_string(2, "")
 		client_cmd(0, "spk %s", WIN_BUILDERS)
+		the_highest_type = 2
+		set_task(0.8, "show_thehighest")
 		
 		return PLUGIN_HANDLED
 	}
+	
+	return PLUGIN_HANDLED
+}
+
+public show_thehighest()
+{	
+	if(the_highest_type == 1)
+	{
+		for(new i=1;i<=MAXPLAYERS;i++)
+		{
+			if(g_iPlayerInfec[i] > g_iPlayerInfec[the_highest] && is_user_valid_connected(i))
+				the_highest = i
+		}
+	}
+	else if(the_highest_type == 2)
+	{
+		for(new i=1;i<=MAXPLAYERS;i++)
+		{
+			if(g_iPlayerKill[i] > g_iPlayerKill[the_highest] && is_user_valid_connected(i))
+				the_highest = i
+		}
+	}
+	
+	set_dhudmessage(250, 0, 0, -1.0, 0.25, 0, 0.0, 5.0, 0.1, 0.05, false)
+	if(the_highest_type == 2)
+	{
+		if(g_iPlayerKill[the_highest] > 1 && is_user_valid_connected(the_highest))
+		{
+			new szPlayerName[32]
+			get_user_name(the_highest, szPlayerName, 31)
+		
+			show_dhudmessage(0, "本局 MVP 是 %s，他本局共杀死了 %d 只丧尸", szPlayerName, g_iPlayerKill[the_highest])
+			return PLUGIN_HANDLED
+		}
+		else the_highest_type = 0
+	}
+	else if(the_highest_type == 1)
+	{
+		if(g_iPlayerInfec[the_highest] > 1 && is_user_valid_connected(the_highest))
+		{
+			new szPlayerName[32]
+			get_user_name(the_highest, szPlayerName, 31)
+		
+			show_dhudmessage(0, "本局 MVP 是 %s，他本局共感染了 %d 名人类", szPlayerName, g_iPlayerInfec[the_highest])
+			return PLUGIN_HANDLED
+		}
+		else the_highest_type = 0
+	}
+	
+	if(!is_user_valid_connected(the_highest) || the_highest <= 0 || the_highest_type == 0)
+	{
+		show_dhudmessage(0, "本局沒有 MVP，请各位在下局努力")
+		return PLUGIN_HANDLED;
+	}
+	
 	return PLUGIN_HANDLED
 }
 
@@ -1217,6 +1307,7 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 	if (TK == 0 && g_attacker != g_victim && g_isZombie[g_attacker])
 	{
 		client_cmd(0, "spk %s", INFECTION)
+		g_iPlayerInfec[g_attacker] ++
 		new szPlayerName[32]
 		get_user_name(g_victim, szPlayerName, 31)
 		set_hudmessage(255, 255, 255, -1.0, 0.45, 0, 1.0, 5.0, 0.1, 0.2, 1)
@@ -1229,6 +1320,8 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 		show_hudmessage(g_victim, "%L", LANG_SERVER, "DEATH_ZOMBIE", g_iZombieTime);
 		set_task(float(g_iZombieTime), "Respawn_Player", g_victim+TASK_RESPAWN)
 		
+		g_iPlayerKill[g_attacker] ++
+		
 		// If victim is boss, Play Killed Sound
 		for(new i=0;i<BOSS_NUM;i++)
 		{
@@ -1240,10 +1333,8 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 				
 				switch(i) // Death Sound
 				{
-					case TYPE_NEMESIS:
-					{
-						client_cmd(0, "spk %s", NEM_KILLED)
-					}
+					case TYPE_NEMESIS: client_cmd(0, "spk %s", NEM_KILLED)
+					case TYPE_COMBINER: client_cmd(0, "spk %s", COMB_KILLED)
 				}
 			}
 		}
@@ -1260,8 +1351,17 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 			{
 				g_iZombieKilled ++
 				
+				if(g_iThisRoundBossNum == 1 && g_iHumanLevelAddUp >= 600)
+				{
+					g_iThisRoundBossNum = 2
+					client_printc(0, "\y[\g基地建设\y] 由于人类等级和超过 \t600\y 级, 本回合将出现双 Boss .")
+				}
+				
 				if(g_iZombieKilled >= g_iBossAppearNeedKill) // And need to appear
 				{
+					if(AppearedNum == 0 && g_iThisRoundBossNum == 2)
+						g_iBossAppearNeedKill += 2
+				
 					Boss_Appear(g_victim) // Custom Function
 				}
 			}
@@ -1384,6 +1484,15 @@ public ham_PlayerSpawn_Post(id)
 				server_cmd("bb_bgm_boss")
 				bb_nemesis_me(id)
 			}
+			else if(g_iBossID[TYPE_COMBINER] == id && !g_bBossKilled[TYPE_COMBINER])
+			{
+				g_szPlayerClass[id] = "Combiner"
+				set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
+				show_dhudmessage(0, "Combiner Detected")
+				client_cmd(0, "spk %s", BOSS_ALARM)
+				server_cmd("bb_bgm_boss")
+				bb_combiner_me(id)
+			}
 			
 			new AppearedNum, KilledNum
 			for(new i=0;i<BOSS_NUM;i++)
@@ -1452,11 +1561,11 @@ public ham_PlayerSpawn_Post(id)
 public task_ZAddHealth(taskid)
 {
 	taskid -= TASK_ZADDHP
-	new iNeedAddHealth = floatround(float(g_iHumanLevelAddUp) / 40) * 100
+	new iNeedAddHealth = floatround(float(g_iHumanLevelAddUp) / 40) * 150
 	if(iNeedAddHealth > 500 && g_isAlive[taskid] && g_isConnected[taskid] && g_isZombie[taskid])
 	{
 		add_health(taskid, iNeedAddHealth)
-		client_printc(taskid, "\y[\g基地建设\y] 由于人类等级和超过 200 级, 共 %d 级, 已为你增加 %d 血量.", g_iHumanLevelAddUp, iNeedAddHealth)
+		client_printc(taskid, "\y[\g基地建设\y] 由于人类等级和超过 \t200\y 级, 共 \t%d\y 级, 已为你增加 \t%d\y 血量.", g_iHumanLevelAddUp, iNeedAddHealth)
 	}
 }
 
@@ -1604,6 +1713,17 @@ public cmdNemme(id)
 	client_cmd(0, "spk %s", BOSS_ALARM)
 	server_cmd("bb_bgm_boss")
 	bb_nemesis_me(id)
+}
+
+public cmdCombme(id)
+{
+	g_iBossID[TYPE_COMBINER] = id
+	g_szPlayerClass[id] = "Combiner"
+	set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
+	show_dhudmessage(0, "Combiner Detected")
+	client_cmd(0, "spk %s", BOSS_ALARM)
+	server_cmd("bb_bgm_boss")
+	bb_combiner_me(id)
 }
 
 public clcmd_changeteam(id)
@@ -2707,7 +2827,7 @@ public fw_EmitSound(id,channel,const sample[],Float:volume,Float:attn,flags,pitc
 		{
 			if (sample[17] == 'w') // wall
 			{
-				emit_sound(id,channel,g_szZombieHit[random(sizeof g_szZombieHit - 1)],volume,attn,flags,pitch)
+				emit_sound(id,channel,g_szZombieHitWall[random(sizeof g_szZombieHitWall - 1)],volume,attn,flags,pitch)
 				return FMRES_SUPERCEDE;
 			}
 			else
