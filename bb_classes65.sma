@@ -27,50 +27,50 @@
 =================================================================================*/
 
 // Classic Zombie Attributes
-new const zclass1_name[] = { "平衡喪屍" }
+new const zclass1_name[] = { "Normal" }
 new const zclass1_info[] = { "能力平衡" }
 new const zclass1_model[] = { "bb_classic" }
-new const zclass1_clawmodel[] = { "v_bloodyhands" }
+new const zclass1_clawmodel[] = { "v_faithbb_zombie_hand" }
 const zclass1_health = 5500
 const zclass1_speed = 260
 const Float:zclass1_gravity = 1.0
 const zclass1_adminflags = ADMIN_ALL
 
 // Fast Zombie Attributes
-new const zclass2_name[] = { "高速喪屍" }
+new const zclass2_name[] = { "Leaper" }
 new const zclass2_info[] = { "速度提升" }
 new const zclass2_model[] = { "bb_fast" }
-new const zclass2_clawmodel[] = { "v_bloodyhands" }
+new const zclass2_clawmodel[] = { "v_faithbb_zombie_hand" }
 const zclass2_health = 3500
 const zclass2_speed = 370
 const Float:zclass2_gravity = 1.0
 const zclass2_adminflags = ADMIN_ALL
 
 // Jumper Zombie Attributes
-new const zclass3_name[] = { "跳躍喪屍" }
+new const zclass3_name[] = { "Jumper" }
 new const zclass3_info[] = { "跳躍特高" }
 new const zclass3_model[] = { "bb_jumper" }
-new const zclass3_clawmodel[] = { "v_bloodyhands" }
+new const zclass3_clawmodel[] = { "v_faithbb_zombie_hand" }
 const zclass3_health = 4050
 const zclass3_speed = 285
 const Float:zclass3_gravity = 0.7
 const zclass3_adminflags = ADMIN_ALL
 
 // Tanker Zombie Attributes
-new const zclass4_name[] = { "坦克喪屍" }
+new const zclass4_name[] = { "Tanker" }
 new const zclass4_info[] = { "血量特高" }
 new const zclass4_model[] = { "bb_tanker" }
-new const zclass4_clawmodel[] = { "v_bloodyhands" }
+new const zclass4_clawmodel[] = { "v_faithbb_zombie_hand" }
 const zclass4_health = 7500
 const zclass4_speed = 210
 const Float:zclass4_gravity = 1.0
 const zclass4_adminflags = ADMIN_ALL
 #define TANK_ARMOR 200
 
-new const zclass5_name[] = { "测试：偽裝喪尸" }
+new const zclass5_name[] = { "测试：Pretender" }
 new const zclass5_info[] = { "偽裝成人類" }
 new const zclass5_model[] = { "sas" }
-new const zclass5_clawmodel[] = { "v_bloodyhands" }
+new const zclass5_clawmodel[] = { "v_faithbb_zombie_hand" }
 const zclass5_health = 2000
 const zclass5_speed = 260
 const Float:zclass5_gravity = 1.0
@@ -83,7 +83,7 @@ new g_zclass_tanker
 // Zombie Classes MUST be registered on plugin_precache
 public plugin_precache()
 {
-	register_plugin("[BB] Default Zombie Classes", "6.5", "Tirant")
+	register_plugin("[BB] ZClass: Default", "6.5", "Tirant")
 	
 	// Register all classes
 	bb_register_zombie_class(zclass1_name, zclass1_info, zclass1_model, zclass1_clawmodel, zclass1_health, zclass1_speed, zclass1_gravity, 0.0, zclass1_adminflags)
