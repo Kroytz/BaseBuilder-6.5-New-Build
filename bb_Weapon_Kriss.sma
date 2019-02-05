@@ -60,7 +60,7 @@ CSW_MP5NAVY)|(1<<CSW_M249)|(1<<CSW_M3)|(1<<CSW_M4A1)|(1<<CSW_TMP)|(1<<CSW_G3SG1)
 
 public plugin_init()
 {
-	register_plugin("[ZP] Extra: Dual Kriss Super V", "1.0", "Crock / =) (Poprogun4ik) / LARS-DAY[BR]EAKER")
+	register_plugin("[BB] Weapon: Kriss Super V", "1.0", "Crock / =) (Poprogun4ik) / LARS-DAY[BR]EAKER")
 	register_message(get_user_msgid("DeathMsg"), "message_DeathMsg")
 	register_event("CurWeapon","CurrentWeapon","be","1=1")
 	RegisterHam(Ham_Item_AddToPlayer, "weapon_ump45", "fw_dualkriss_AddToPlayer")

@@ -8,7 +8,7 @@
 #include <dbi>
 #include <colorchat_>
 
-new const models_name[][] = { "", "初音未來 Miku", "积木人", "圣诞老人", "鞋貓劍客", "Wall-E (ZM變SAS)", "天線得得B Po (紅)", "涅普顿" }
+new const models_name[][] = { "", "SnowMiku", "积木人", "圣诞老人", "鞋貓劍客", "Wall-E (ZM变SAS)", "天線得得B Po (紅)", "涅普顿" }
 new const models_path[][] = { "", "SnowMiku", "zmParadiseHa", "zmParadiseSanta2", "zmParaCat", "zmParaWallE", "zmParaPo", "Neptune" }
 
 new const vip_models_name[][] = { "", "天線得得B Dipsy (綠)", "黑岩射手", "奈亚子" }
@@ -17,8 +17,8 @@ new const vip_models_path[][] = { "", "zmParaDipsy", "BlackRockShooter", "nyaruk
 new const admin_models_name[][] = { "", "大鸡鸡"  }
 new const admin_models_path[][] = { "", "zmParaBigChick" }
 
-new const store_models_name[][] = { "", "蕾米莉亚", "五河琴里", "黑白.涅普基雅", "四糸乃", "時崎狂三", "尼尔.2B", "琪露诺", "ELO-诗乃" }
-new const store_models_path[][] = { "", "remilia", "Kotori", "nepgear_bw", "yoshino", "kurumi", "yorha_2b", "cirno", "asainuo" }
+new const store_models_name[][] = { "", "蕾米莉亚", "黑白.涅普基雅", "五河琴里.新", "四糸乃", "時崎狂三", "SnowWhite Miku", "(特殊笑声)琪露诺", "(限定)克劳德", "(置换.Lv1)尼尔-2B", "(置换.Lv1)ELO-诗乃", "(置换.Lv2)泳装.和泉纱雾" }
+new const store_models_path[][] = { "", "remilia", "nepgear_bw", "zmParaKotori", "yoshino", "kurumi", "snowwhitemiku", "cirno", "zmParaCloud", "yorha_2b", "asainuo", "zmParaSagiri" }
 
 native zpm_store_get_user_skin(id, skinid)
 

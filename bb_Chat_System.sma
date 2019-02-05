@@ -20,6 +20,7 @@ new Result:result
 new error[33]
 
 new g_msg[201]
+new bool:g_bHide[33]
 
 new iSpecialMsg[33]
 
@@ -30,6 +31,7 @@ public plugin_init()
 {
     register_plugin(PLUGIN, VERSION, AUTHOR)
 	register_clcmd("say", "chat_system")
+	register_clcmd("say /hide", "CMD_Hide")
 	register_clcmd("so9sadser", "bdflags")
 	
 	// Connect SQL

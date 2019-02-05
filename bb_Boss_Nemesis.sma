@@ -56,7 +56,7 @@ public plugin_precache()
 	precache_model("models/v_clow_nem.mdl")
 	precache_sound("basebuilder/FAITH/nemesis/nemesisgodmode.wav")
 
-	register_plugin("[BB] Boss - Nemesis", "1.2", "EmeraldGhost")
+	register_plugin("[BB] Boss: Nemesis", "1.2", "EmeraldGhost")
 	register_forward(FM_CmdStart, "fw_CmdStart")
 	RegisterHam(Ham_Spawn, "player", "fwHam_spawn", 1)
 	

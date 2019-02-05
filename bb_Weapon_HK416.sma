@@ -60,7 +60,7 @@ new const WEAPONENTNAMES[][] = { "", "weapon_p228", "", "weapon_scout", "weapon_
 
 public plugin_init()
 {
-	register_plugin("HK416", "1.0", "Crock / =) (Poprogun4ik) / LARS-DAY[BR]EAKER / Fartik:D")
+	register_plugin("[BB] Weapon: HK416", "1.0", "Crock / =) (Poprogun4ik) / LARS-DAY[BR]EAKER / Fartik:D")
 	register_message(get_user_msgid("DeathMsg"), "message_DeathMsg")
 	register_event("CurWeapon","CurrentWeapon","be","1=1")
 	RegisterHam(Ham_Item_AddToPlayer, "weapon_m4a1", "fw_hk416_AddToPlayer")

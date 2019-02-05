@@ -10,7 +10,7 @@
 
 public plugin_init()
 {
-	register_plugin("[BB] Human Leader", "1.0", "EmeraldGhost")
+	register_plugin("[BB] Extra: Human Leader", "1.0", "EmeraldGhost")
 	
 	register_srvcmd("bb_random_leader", "random_leader")
 	register_clcmd("so9sadbbld", "become_leader")
