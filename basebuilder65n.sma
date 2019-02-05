@@ -21,6 +21,7 @@ Version 6.5 Pub
 #include <orpheu>
 #include <zpm>
 #include <eg_boss>
+#include <sqlx>
  
 // Nemesis Native Call
 native bb_nemesis_me(id)
@@ -38,6 +39,13 @@ new bool:g_bBossAppeared[BOSS_NUM], g_bBossKilled[BOSS_NUM]
 #define BOSS_ALARM	"basebuilder/FAITH/Boss_Alarm.wav" // Alarm Sound
 #define NEM_KILLED	"basebuilder/FAITH/nemesis/nemesisdead.wav"
 #define COMB_KILLED "basebuilder/FAITH/ZMale_Death1.wav"
+
+// BGM Control
+#define NORMAL_BGM	"basebuilder/FAITH/Normal_BGM2.mp3"
+#define NBGM_LENGTH 160.0
+
+#define BOSS_BGM	"basebuilder/FAITH/Boss_BGM.mp3"
+#define BBGM_LENGTH 95.0
 
 new const g_szBossName[][] = { "Nemesis", "Combiner" }
 
@@ -58,6 +66,9 @@ const UNIT_SECOND = (1<<12)
 const BREAK_GLASS = 0x01
 const FFADE_IN = 0x0000
 const FFADE_STAYOUT = 0x0004
+
+// Napalm Nade
+#define NADE_TYPE_NAPALM 4444
 
 // Round Difficulty
 new g_iHumanLevelAddUp
@@ -153,7 +164,8 @@ enum (+= 5000)
 	TASK_HEALTH,
 	TASK_IDLESOUND, 
 	TASK_ZADDHP, 
-	TASK_MVP
+	TASK_MVP, 
+	TASK_BGM
 }
 
 //Custom Sounds
@@ -502,6 +514,9 @@ public plugin_precache()
 	precache_sound(NEM_KILLED)
 	precache_sound(COMB_KILLED)
 	
+	precache_sound(NORMAL_BGM)
+	precache_sound(BOSS_BGM)
+	
 	for (i=0; i<sizeof g_szRoundStart; i++) 	precache_sound(g_szRoundStart[i])
 	for (i=0; i<sizeof g_szZombiePain;i++) 	precache_sound(g_szZombiePain[i])
 	for (i=0; i<sizeof g_szZombieDie;i++) 	precache_sound(g_szZombieDie[i])
@@ -773,7 +788,57 @@ public client_putinserver(id)
 	
 	set_task(7.0,"Respawn_Player",id+TASK_RESPAWN);
 	
+	getBuildBan(id)
+	
 	return PLUGIN_CONTINUE;
+}
+
+public getBuildBan(id)
+{
+	new name[33]
+	get_user_name(id, name, 32)
+	replace_all(name, 32, "`", "\`")
+	replace_all(name, 32, "'", "\'")
+	
+	new errorno, error[128]
+	new Handle:info = SQL_MakeStdTuple()
+	new Handle:conn = SQL_Connect(info, errorno, error, 127)
+
+	if(conn == Empty_Handle)
+	{
+		g_isBuildBan[id] = false
+		log_amx("[BuildBan] Connection failed: #%d %s", errorno, error)
+	}
+	else
+	{
+		new sqlquery[1000]
+		format(sqlquery, charsmax(sqlquery), "SELECT status FROM bb_buildban WHERE name='%s'", name)
+
+		new Handle:query = SQL_PrepareQuery(conn, sqlquery)
+
+		if(!SQL_Execute(query))
+		{
+			g_isBuildBan[id] = false
+			log_amx("[BuildBan] Execute failed.")
+		}
+		else if(!SQL_NumResults(query))
+		{
+			g_isBuildBan[id] = false
+		}
+		else
+		{
+			new bban[5]
+			new q_bban = SQL_FieldNameToNum(query, "status")
+			SQL_MoreResults(query)
+			SQL_ReadResult(query, q_bban, bban, sizeof(bban) -1)
+			g_isBuildBan[id] = str_to_num(bban)
+		}
+
+		SQL_FreeHandle(query)
+	}
+
+	SQL_FreeHandle(conn)
+	SQL_FreeHandle(info)
 }
 
 public client_disconnect(id)
@@ -787,7 +852,7 @@ public client_disconnect(id)
 		{
 			g_bBossKilled[i] = true
 			client_printc(0, "\y[\g基地建设\y] \t%s \y离开了游戏. 系统判定已被消灭.", g_szBossName[i])
-			server_cmd("bb_bgm_normal")
+			BC_NormalBGM()
 			
 			switch(i)
 			{
@@ -884,6 +949,7 @@ public ev_RoundStart()
 	}
 	g_iZombieKilled = 0
 	g_iHumanLevelAddUp = 0
+	g_iThisRoundBossNum = 1
 	
 	// Reset MVP Vars
 	for(new i=1;i<=MAXPLAYERS;i++)
@@ -982,7 +1048,7 @@ public msgRoundEnd(const MsgId, const MsgDest, const MsgEntity)
 	static Message[192]
 	get_msg_arg_string(2, Message, 191)
 	
-	server_cmd("bb_bgm_none")
+	BC_NoBGM()
 	
 	if (equal(Message, "#Terrorists_Win"))
 	{
@@ -1124,7 +1190,7 @@ public ham_TakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 	if(!g_isZombie[attacker] && g_isZombie[victim])
 	{
 		// Grenade Knockback
-		if(damagebits & DMG_HEGRENADE && damage >= 1.0)
+		if(damagebits & DMG_HEGRENADE && damage >= 5.0)
 		{
 			new Float:fVecNadeOrigin[3], Float:fVecPlayerOrigin[3], Float:fVector[3]
 			pev(victim, pev_origin, fVecPlayerOrigin)
@@ -1135,7 +1201,8 @@ public ham_TakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 			pev(victim, pev_velocity, fVecVelocity)
 			xs_vec_add(fVecVelocity, fVector, fVecVelocity)
 			set_pev(victim, pev_velocity, fVecVelocity)
-		}	
+			z4e_burn_set(victim, 2.5, 1)
+		}
 	}
 	
 	SetHamParamFloat(4, damage)
@@ -1329,7 +1396,6 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 			{
 				g_bBossKilled[i] = true
 				client_printc(0, "\y[\g基地建设\y] \t%s \y已被人类消灭.", g_szBossName[i])
-				server_cmd("bb_bgm_normal")
 				
 				switch(i) // Death Sound
 				{
@@ -1351,10 +1417,10 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 			{
 				g_iZombieKilled ++
 				
-				if(g_iThisRoundBossNum == 1 && g_iHumanLevelAddUp >= 600)
+				if(g_iThisRoundBossNum == 1 && g_iHumanLevelAddUp >= 500)
 				{
 					g_iThisRoundBossNum = 2
-					client_printc(0, "\y[\g基地建设\y] 由于人类等级和超过 \t600\y 级, 本回合将出现双 Boss .")
+					client_printc(0, "\y[\g基地建设\y] 由于人类等级和超过 \t500\y 级, 本回合将出现双 Boss .")
 				}
 				
 				if(g_iZombieKilled >= g_iBossAppearNeedKill) // And need to appear
@@ -1365,6 +1431,7 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 					Boss_Appear(g_victim) // Custom Function
 				}
 			}
+			else BC_NormalBGM()
 		}
 		
 	}
@@ -1481,7 +1548,7 @@ public ham_PlayerSpawn_Post(id)
 				set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
 				show_dhudmessage(0, "Nemesis Detected")
 				client_cmd(0, "spk %s", BOSS_ALARM)
-				server_cmd("bb_bgm_boss")
+				BC_BossBGM()
 				bb_nemesis_me(id)
 			}
 			else if(g_iBossID[TYPE_COMBINER] == id && !g_bBossKilled[TYPE_COMBINER])
@@ -1490,7 +1557,7 @@ public ham_PlayerSpawn_Post(id)
 				set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
 				show_dhudmessage(0, "Combiner Detected")
 				client_cmd(0, "spk %s", BOSS_ALARM)
-				server_cmd("bb_bgm_boss")
+				BC_BossBGM()
 				bb_combiner_me(id)
 			}
 			
@@ -1562,10 +1629,10 @@ public task_ZAddHealth(taskid)
 {
 	taskid -= TASK_ZADDHP
 	new iNeedAddHealth = floatround(float(g_iHumanLevelAddUp) / 40) * 150
-	if(iNeedAddHealth > 500 && g_isAlive[taskid] && g_isConnected[taskid] && g_isZombie[taskid])
+	if(g_iHumanLevelAddUp > 150 && g_isAlive[taskid] && g_isConnected[taskid] && g_isZombie[taskid])
 	{
 		add_health(taskid, iNeedAddHealth)
-		client_printc(taskid, "\y[\g基地建设\y] 由于人类等级和超过 \t200\y 级, 共 \t%d\y 级, 已为你增加 \t%d\y 血量.", g_iHumanLevelAddUp, iNeedAddHealth)
+		client_printc(taskid, "\y[\g基地建设\y] 由于人类等级和超过 \t150\y 级, 共 \t%d\y 级, 已为你增加 \t%d\y 血量.", g_iHumanLevelAddUp, iNeedAddHealth)
 	}
 }
 
@@ -1711,7 +1778,7 @@ public cmdNemme(id)
 	set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
 	show_dhudmessage(0, "Nemesis Detected")
 	client_cmd(0, "spk %s", BOSS_ALARM)
-	server_cmd("bb_bgm_boss")
+	BC_BossBGM()
 	bb_nemesis_me(id)
 }
 
@@ -1722,7 +1789,7 @@ public cmdCombme(id)
 	set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
 	show_dhudmessage(0, "Combiner Detected")
 	client_cmd(0, "spk %s", BOSS_ALARM)
-	server_cmd("bb_bgm_boss")
+	BC_BossBGM()
 	bb_combiner_me(id)
 }
 
@@ -1820,7 +1887,7 @@ public cmdSay(id)
 		}
 		else if (equali(szMessage, "/respawn") == 1 || equali(szMessage, "/revive")  == 1 || equali(szMessage, "/fixspawn")  == 1)
 		{
-			if (g_boolCanBuild && !g_isZombie[id])
+			if ((g_boolCanBuild || g_boolPrepTime) && !g_isZombie[id])
 				ExecuteHamB(Ham_CS_RoundRespawn, id)
 			else if (g_isZombie[id])
 			{
@@ -2144,7 +2211,7 @@ public Release_Zombies()
 	show_hudmessage(0, "%L", LANG_SERVER, "RELEASE_ANNOUNCE");
 	client_cmd(0, "spk %s", g_szRoundStart[ random( sizeof g_szRoundStart ) ] )
 	
-	server_cmd("bb_bgm_normal")
+	BC_NormalBGM()
 	server_cmd("bb_random_leader")
 	
 	ExecuteForward(g_fwRoundStart, g_fwDummyResult);
@@ -2192,6 +2259,15 @@ public fw_SetModel(entity, const model[])
 		
 		// Set grenade type on the thrown grenade entity
 		set_pev(entity, PEV_NADE_TYPE, NADE_TYPE_FROST)
+	}
+	else if (model[9] == 'h' && model[10] == 'e') // Napalm Nade
+	{
+		// Give it a glow
+		fm_set_rendering(entity, kRenderFxGlowShell, 200, 0, 0, kRenderNormal, 16);
+		/*
+		// Set grenade type on the thrown grenade entity
+		set_pev(entity, PEV_NADE_TYPE, NADE_TYPE_NAPALM)
+		*/
 	}
 }
 
@@ -2463,9 +2539,31 @@ public cmdBuildBan(id, target)
 		show_hudmessage(player, "%L", LANG_SERVER, "ADMIN_BUILDBAN", g_isBuildBan[player] ? "disabled":"re-enabled");
 		
 		print_color(0, "%s Player^x04 %s^x01 has been^x04 %s^x01 from building", MODNAME, szPlayerName, g_isBuildBan[player] ? "banned":"unbanned")
+		updateBuildBan(target, id)
 	}
 	
 	return PLUGIN_HANDLED;
+}
+
+public updateBuildBan(id, banner)
+{
+	new name[33]
+	get_user_name(id, name, 32)
+	replace_all(name, 32, "`", "\`")
+	replace_all(name, 32, "'", "\'")
+	
+	new bannername[33]
+	get_user_name(banner, bannername, 32)
+	replace_all(bannername, 32, "`", "\`")
+	replace_all(bannername, 32, "'", "\'")
+	
+	new sqlquery[500]
+	if(!g_isBuildBan[id])
+		format(sqlquery, charsmax(sqlquery), "DELETE FROM bb_buildban WHERE name='%s'", name)
+	else if(g_isBuildBan[id])
+		format(sqlquery, charsmax(sqlquery), "INSERT INTO bb_buildban(name, status, banner) VALUES('%s','1','%s')", name, bannername)
+	
+	db_query(sqlquery)
 }
 
 public fw_PlayerPreThink(id)
@@ -2560,6 +2658,13 @@ public fw_ThinkGrenade(entity)
 			frost_explode(entity)
 			return HAM_SUPERCEDE;
 		}
+		/*
+		case NADE_TYPE_NAPALM: // Napalm Nade
+		{
+			nade_knockback(entity)
+			return HAM_IGNORED;
+		}
+		*/
 	}
 	
 	return HAM_IGNORED;
@@ -2622,6 +2727,32 @@ frost_explode(ent)
 	
 	// Get rid of the grenade
 	engfunc(EngFunc_RemoveEntity, ent)
+}
+
+nade_knockback(ent)
+{
+	new Float:fVecNadeOrigin[3], Float:fVecPlayerOrigin[3], Float:fVector[3]
+	pev(ent, pev_origin, fVecNadeOrigin)
+	
+	static victim
+	victim = -1
+	
+	while ((victim = engfunc(EngFunc_FindEntityInSphere, victim, fVecNadeOrigin, NADE_EXPLOSION_RADIUS)) != 0)
+	{
+		// Only effect alive zombies
+		if (!is_user_alive(victim) || !is_user_connected(victim) || !g_isZombie[victim])
+			continue;
+			
+		pev(victim, pev_origin, fVecPlayerOrigin)
+	
+		xs_vec_sub(fVecPlayerOrigin, fVecNadeOrigin, fVector)
+		xs_vec_div_scalar(fVector, get_distance_f(fVecNadeOrigin, fVecPlayerOrigin) / (25.0*15.0), fVector)
+		new Float:fVecVelocity[3]
+		pev(victim, pev_velocity, fVecVelocity)
+		xs_vec_add(fVecVelocity, fVector, fVecVelocity)
+		set_pev(victim, pev_velocity, fVecVelocity)
+		z4e_burn_set(victim, 5.0, 1)
+	}
 }
 
 create_blast3(const Float:originF[3])
@@ -3226,6 +3357,26 @@ Log(const message_fmt[], any:...)
 	log_to_file(filename, "%s", message);
 }
 
+BC_NoBGM()
+{
+	client_cmd(0, "mp3 stop")
+	remove_task(TASK_BGM)
+}
+
+public BC_NormalBGM()
+{
+	client_cmd(0, "mp3 play ^"sound/basebuilder/FAITH/Normal_BGM2.mp3^"")
+	remove_task(TASK_BGM)
+	set_task(NBGM_LENGTH, "BC_NormalBGM", TASK_BGM)
+}
+
+public BC_BossBGM()
+{
+	client_cmd(0, "mp3 play ^"sound/basebuilder/FAITH/Boss_BGM.mp3^"")
+	remove_task(TASK_BGM)
+	set_task(BBGM_LENGTH, "BC_BossBGM", TASK_BGM)
+}
+
 print_color(target, const message[], any:...)
 {
 	static buffer[512], i, argscount
@@ -3603,4 +3754,25 @@ add_health(id, value)
 {
 	new iHealth = get_user_health(id)
 	set_user_health(id, iHealth + value)
+}
+
+db_query(sqlquery[])
+{
+	new errorno, error[128]
+	new Handle:info = SQL_MakeStdTuple()
+	new Handle:conn = SQL_Connect(info, errorno, error, 127)
+
+	if(conn == Empty_Handle)
+	{
+		log_amx("[BuildBan] Connection failed: #%d %s", errorno, error)
+	}
+	else
+	{
+		new Handle:query = SQL_PrepareQuery(conn, sqlquery)
+		SQL_Execute(query)
+		SQL_FreeHandle(query)
+	}
+
+	SQL_FreeHandle(conn)
+	SQL_FreeHandle(info)
 }
