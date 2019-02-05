@@ -72,8 +72,8 @@ public Become_Boss(id)
 	give_item(id, "item_assaultsuit");
 	cs_set_user_armor(id, 500, CS_ARMOR_VESTHELM);
 	
-	set_user_health(id, ict * 6750 + 2500)
-	set_user_maxspeed(id, 270*1.0)
+	set_user_health(id, ict * 10125 + 2500)
+	set_user_maxspeed(id, 270 * 1.0)
 	set_user_gravity(id, 0.8)
 }
 
@@ -102,7 +102,7 @@ public boss_skill_reload(taskid)
         }
 		else
 		{
-			g_iBossCountdown[id] += 22
+			g_iBossCountdown[id] += 18
 			client_print(id, print_center, "【 Reload: %d / 888丨按 'R' 选择技能】", g_iBossCountdown[id])
 		}
 	}
