@@ -81,8 +81,8 @@ new const magical_initskill[][] = { "null", "焰环" }
 #define Gravity_PerLevel	0.0125
 #define Damage_PerLevel	0.01
 
-#define MAXLEVEL 200
-#define MAXBLEVEL 10
+#define MAXLEVEL 300
+#define MAXBLEVEL 5
 
 new g_statushud
 new g_damage[33]
@@ -125,6 +125,9 @@ new Result:result
 new error[33]
 new g_iSQLInit = 1
 
+// -- Player Bonus
+new g_iPlayerCount, g_iPlayerBonus
+
 public plugin_init() 
 {
     register_plugin(PLUGIN, VERSION, AUTHOR)
@@ -150,9 +153,13 @@ public plugin_init()
 
     register_clcmd("so9sadbls","display_version")
     register_clcmd("so9sadser","bdflags")
+	
+	// -- Server Commands
+	register_srvcmd("bb_reset_hmhealth", "ResetHumanHealth")
     
 	// -- Hook events & forwards
-    register_event("ResetHUD","ev_ResetHud","be")
+	register_event("HLTV", 	"ev_RoundStart", "a", "1=0", "2=0")
+    register_event("ResetHUD", "ev_ResetHud", "be")
     register_event("CurWeapon", "event_CurWeapon", "be", "1=1")
 	register_forward(FM_CmdStart, "fw_CmdStart")
 	register_forward(FM_PlayerPreThink, "fw_PlayerPreThink")
@@ -168,7 +175,7 @@ public plugin_init()
     register_concmd("give_cash", "cmd_give_cash", ADMIN_IMMUNITY, "- give_cash <玩家> <數量> : 給予點數 Cash")
     register_concmd("give_gp", "cmd_give_gp", ADMIN_IMMUNITY, "- give_gp <玩家> <數量> : 給予枪械点 GP")
     register_concmd("give_sp", "cmd_give_points", ADMIN_IMMUNITY, "- give_sp <玩家> <數量> : 給予技能點 SkillPoint")
-	register_concmd("give_battleexp", "cmd_give_bexp", ADMIN_IMMUNITY, "- give_bexp <玩家> <數量> : 給予战斗熟练度 BattleExp")
+	register_concmd("give_battleexp", "cmd_give_bexp", ADMIN_IMMUNITY, "- give_battleexp <玩家> <數量> : 給予战斗熟练度 BattleExp")
 	
 	// -- Messages
 	register_message(get_user_msgid("CurWeapon"), "message_cur_weapon")
@@ -215,15 +222,42 @@ public plugin_natives()
     register_native("set_user_level", "native_set_user_level", 1)
     register_native("get_user_sp", "native_get_user_sp", 1)
     register_native("set_user_sp", "native_set_user_sp", 1)
+	
+	register_native("is_user_in_zammo", "Native_Get_ZAmmo", 1)
 }
 
-public ev_ResetHud(id) //解釋NewRound
+public ev_ResetHud(id)
 {
 	function(id)
 	g_damage[id] = 0
 	g_RoundDamage[id] = 0
 	iPlayerMainSkillUsed[id] = 0
-	client_printc(id, "\y[\g基地建设\y] 您可以按'M'打开玩家菜单, 按'O'打开升级主菜单.");
+}
+
+public ev_RoundStart()
+{
+	client_printc(0, "\y[\g基地建设\y] 您可以按'M'打开玩家菜单, 按'O'打开升级主菜单.");
+	set_task(1.0, "ReCheckPlayerNum")
+}
+
+public ReCheckPlayerNum()
+{
+	g_iPlayerBonus = 1
+	g_iPlayerCount = get_playersnum(0)
+	
+	if(g_iPlayerCount >= 16)
+	{
+		g_iPlayerBonus = 3
+		client_printc(0, "\y[\g人数检测\y] 当前在线玩家人数大于 \t16 \y人, 所有人获取\tEXP&点数\y获得 \t3\y 倍加成.");
+	}
+	else if(g_iPlayerCount >= 8)
+	{
+		g_iPlayerBonus = 2
+		client_printc(0, "\y[\g人数检测\y] 当前在线玩家人数大于 \t8 \y人, 所有人获取\tEXP&点数\y获得 \t2\y 倍加成.");
+	}
+
+	g_iPlayerBonus *= 2
+	client_printc(0, "\y[\g新年活动\y] 新年快乐! 玩的开心! EXP&点数 2 倍加成 !");
 }
 
 public event_CurWeapon(id)
@@ -361,6 +395,8 @@ public Use_Init_Skill(id, skillid)
 	}
 	return PLUGIN_HANDLED;
 }
+
+public Native_Get_ZAmmo(id) return g_has_unlimited_clip[id]
 
 public Invis_Skillend(taskid)
 {
@@ -684,7 +720,7 @@ public SaveData(id)
 	new wjsl = get_playersnum(0)
 	if(wjsl < 4)
 	{
-		client_printc(id, "\t由于玩家数量小于 4 人, 你的数据不会被保存.")
+		client_printc(id, "\t由于玩家数量小于 4 人, 你的等级数据不会被保存.")
 		return PLUGIN_HANDLED
 	}
 
@@ -888,10 +924,10 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 	
 	if(RewardMultiply > 0)
 	{
-		g_xp[attacker] += get_pcvar_num(DXP) * RewardMultiply
-		g_cash[attacker] += get_pcvar_num(DCH) * RewardMultiply
+		g_xp[attacker] += get_pcvar_num(DXP) * RewardMultiply * g_iPlayerBonus
+		g_cash[attacker] += get_pcvar_num(DCH) * RewardMultiply * g_iPlayerBonus
 		g_BattleExp[attacker] += RewardMultiply
-		client_print(attacker, print_center, "EXP + %d  &  Cash + %d", get_pcvar_num(DXP) * RewardMultiply, get_pcvar_num(DCH) * RewardMultiply)
+		client_print(attacker, print_center, "EXP + %d  &  Cash + %d", get_pcvar_num(DXP) * RewardMultiply * g_iPlayerBonus, get_pcvar_num(DCH) * RewardMultiply * g_iPlayerBonus)
 		
 		function(attacker)
 	}
@@ -906,15 +942,15 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 	
     if(cs_get_user_team(attacker) == CS_TEAM_CT)
     {
-    	g_xp[attacker] += get_pcvar_num(CKXP)
-    	g_cash[attacker] += get_pcvar_num(CKCH)
-    	client_printc(attacker, "\g[击杀奖励]\y 你杀死了一只僵尸! 获得了\g %d \y经验 ,\g %d \yCash !!", get_pcvar_num(CKXP), get_pcvar_num(CKCH))
+    	g_xp[attacker] += get_pcvar_num(CKXP) * g_iPlayerBonus
+    	g_cash[attacker] += get_pcvar_num(CKCH) * g_iPlayerBonus
+    	client_printc(attacker, "\y[\g击杀奖励\y] 你杀死了一只僵尸! 获得了\g %d \y经验 ,\g %d \yCash !!", get_pcvar_num(CKXP) * g_iPlayerBonus, get_pcvar_num(CKCH) * g_iPlayerBonus)
     }
     else if(cs_get_user_team(attacker) == CS_TEAM_T)
     {
-    	g_xp[attacker] += get_pcvar_num(TKXP)
-    	g_cash[attacker] += get_pcvar_num(TKCH)
-    	client_printc(attacker, "\g[击杀奖励]\y 你杀死了一名人类! 获得了\g %d \y经验 ,\g %d \yCash !!", get_pcvar_num(TKXP), get_pcvar_num(TKCH))
+    	g_xp[attacker] += get_pcvar_num(TKXP) * g_iPlayerBonus
+    	g_cash[attacker] += get_pcvar_num(TKCH) * g_iPlayerBonus
+    	client_printc(attacker, "\y[\g击杀奖励\y] 你感染了一名人类! 获得了\g %d \y经验 ,\g %d \yCash !", get_pcvar_num(TKXP) * g_iPlayerBonus, get_pcvar_num(TKCH) * g_iPlayerBonus)
     }
 	
 	function(attacker)
@@ -1258,6 +1294,21 @@ public fwHamPlayerSpawnPost(id)
  
 	if(iPlayerJob[id] == JOB_KILLER) set_user_rendering(id, kRenderFxNone, kRenderNormal)
 	return PLUGIN_HANDLED;
+}
+
+public ResetHumanHealth()
+{
+	for(new i=1;i<33;i++)
+	{
+		if(!zp_get_user_zombie(i))
+		{
+			if(g_HealthLevel[i] >= 1)
+			{
+				set_user_health(i, 100)
+				add_health(i,g_HealthLevel[i] * Health_PerLevel)
+			}
+		}
+	}
 }
 
 public fw_CmdStart(id, uc_handle, seed) 
