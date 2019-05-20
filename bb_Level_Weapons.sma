@@ -6,6 +6,7 @@
 #include <fakemeta>
 #include <hamsandwich>
 #include <eg_boss>
+#include <ColorChat_>
 
 #define PLUGIN "[BB] Level: Gun Shop"
 #define VERSION "S1v2"
@@ -19,10 +20,16 @@ new error[33]
 new const is_bought_gun[][] = { "未购买", "已购买" }
 
 // Primary Weapons
-new const pri_gun_type[][] = { "null", "[突击步枪]", "[冲锋枪]", "[冲锋枪]" }
-new const pri_gun_name[][] = { "null", "416-C Carbine", "Kriss Super V", "爆炎蒸汽 SPSMG" }
-new const pri_gun_cost[] = { 0, 150, 100, 150 }
-new const pri_gun_code[][] = { "null", "hk416", "kriss", "spsmg" }
+new const pri_gun_type[][] = { "null", "[突击步枪]", "[冲锋枪]", "[冲锋枪]" } // 写[类型]
+new const pri_gun_name[][] = { "null", "416-C Carbine", "Kriss Super V", "爆炎蒸汽 SPSMG" } // 写武器名字
+new const pri_gun_cost[] = { 0, 150, 100, 150 } // 写价格
+new const pri_gun_code[][] = { "null", "hk416", "kriss", "spsmg" } // 武器代号
+
+// Primary Weapons - HighPlayer
+new const pri_gun_type_hp[][] = { "null", "[狙击枪]" } // 写[类型]
+new const pri_gun_name_hp[][] = { "null", "PGM Hecate II" } // 写武器名字
+new const pri_gun_cost_hp[] = { 0, 500 } // 写价格
+new const pri_gun_code_hp[][] = { "null", "hecate" } // 武器代号
 
 // Secondrary Weapons
 new const sec_gun_type[][] = { "null", "[榴弹发射器]" }
@@ -39,6 +46,9 @@ new g_iSelectSec[33]
 //永久槍代數
 new g_iForeverGun[33][sizeof pri_gun_code]
 
+//永久槍代數 - HP
+new g_iForeverGunHP[33][sizeof pri_gun_code_hp]
+
 //永久手槍代數
 new g_iForeverHandGun[33][sizeof sec_gun_code]
 
@@ -49,6 +59,7 @@ public plugin_init()
 {
     register_plugin(PLUGIN, VERSION, AUTHOR)
     register_clcmd("fshopgun","fshop_gun")
+	register_clcmd("fshophpgun","fshop_gun_hp")
     register_clcmd("fshophandgun","fshop_handgun")
     register_clcmd("fshopother","fshop_other")
     register_clcmd("myfgmenu","myfg_menu")
@@ -77,6 +88,7 @@ public plugin_init()
 public ham_PlayerSpawn_Post(id)
 {
 	g_iSelectPri[id] = 0
+	g_iSelectSec[id] = 0
 }
 
 public fshop_gun(id) //永久商城主槍械(己列出例子)
@@ -160,6 +172,93 @@ public BuyFgun(id, wpnid)
 	 }
 }
 
+public fshop_gun_hp(id) //永久商城主槍械(己列出例子) - HP
+{
+		if(get_user_level(id) < 200)
+		{
+			ColorChat(id, RED, "等级不足 200 级, 无法进入高玩枪商店!")
+			return PLUGIN_HANDLED;
+		}
+
+		new menu = menu_create("\r永久商城 - 高玩枪", "fshop2hp_handler");
+				
+		new szTempid[32]
+		for(new i = 1; i < sizeof pri_gun_code; i++)
+		{
+			new szItems[101]
+			//\g[突击步枪]\y416-C Carbine     \g100 武器点
+			formatex(szItems, 100, "\g%s\y%s     \g%d 武器点", pri_gun_type_hp[i], pri_gun_name_hp[i], pri_gun_cost_hp[i])
+			num_to_str(i, szTempid, 31)
+			menu_additem(menu, szItems, szTempid, 0)
+		}
+		
+		menu_setprop(menu, MPROP_NUMBER_COLOR, "\r"); 
+		menu_setprop(menu, MPROP_BACKNAME, "返回"); 
+		menu_setprop(menu, MPROP_NEXTNAME, "更多..."); 
+		menu_setprop(menu, MPROP_EXITNAME, "退出"); 
+		menu_setprop(menu, MPROP_EXIT, MEXIT_ALL);
+		
+		menu_display(id, menu, 0);
+		return PLUGIN_HANDLED;
+}
+
+public fshop2hp_handler(id, menu, item)
+{
+	new sz_Name[ 32 ];
+	
+	get_user_name( id, sz_Name, 31 );
+
+	if(item==MENU_EXIT)
+	{
+		menu_destroy(menu);
+		
+		return PLUGIN_HANDLED;
+	}
+	
+	new data[6], szName[64];
+	new access, callback;
+	
+	menu_item_getinfo(menu, item, access, data, charsmax(data), szName, charsmax(szName), callback);
+	
+	new key = str_to_num(data);
+
+	if(key <= (sizeof pri_gun_code_hp - 1))
+	{
+		BuyFgunHP(id, key)
+	}
+	else 
+	{
+		menu_destroy(menu);
+		return PLUGIN_HANDLED;
+	}
+}
+
+public BuyFgunHP(id, wpnid)
+{
+	 if (!g_iForeverGunHP[id][wpnid])
+	 {
+		if (get_user_gp(id) >= pri_gun_cost_hp[wpnid])
+		{
+			log_buy(id, wpnid)
+			g_iForeverGunHP[id][wpnid] = 1
+			set_user_gp(id, get_user_gp(id) - pri_gun_cost_hp[wpnid])
+			client_printc(id, "\g[永久商城] \t你己购买了 \y%s\t! 可到\y我的背包\t装备。", pri_gun_name_hp[wpnid])
+			client_print(id, print_console, "[FGUNSHOP] 你己購買了 %s !可到 我的背包 装备。", pri_gun_name_hp[wpnid]) 
+			savefguns(id)
+		}
+		else
+		{
+			client_printc(id, "\g[永久商城] \t你没有足够的\y 武器点 \t!!")
+			client_print(id, print_console, "[FGUNSHOP] 你沒有足夠的武器點!!") 
+		}
+	 }
+	 else
+	 {
+		client_printc(id, "\g[永久商城] \t你己拥有这把\y永久枪\t。")
+		client_print(id, print_console, "[FGUNSHOP] 你己擁有該把永久槍。") 
+	 }
+}
+
 public fshop_handgun(id)//永久商城副槍械(己列出例子)
 {
 		new menu = menu_create("\r永久商城 - 永久手枪", "fshop3_handler");
@@ -224,8 +323,8 @@ public BuyFHgun(id, wpnid)
 			log_buy(id, wpnid)
 			g_iForeverHandGun[id][wpnid] = 1
 			set_user_gp(id, get_user_gp(id) - sec_gun_cost[wpnid])
-			client_printc(id, "\g[永久商城] \t你己购买了 \y%s\t! 可到\y我的背包\t装备。", pri_gun_name[wpnid])
-			client_print(id, print_console, "[FGUNSHOP] 你己購買了 %s !可到 我的背包 装备。", pri_gun_name[wpnid]) 
+			client_printc(id, "\g[永久商城] \t你己购买了 \y%s\t! 可到\y我的背包\t装备。", sec_gun_name[wpnid])
+			client_print(id, print_console, "[FGUNSHOP] 你己購買了 %s !可到 我的背包 装备。", sec_gun_name[wpnid]) 
 			savefguns(id)
 		}
 		else
@@ -875,7 +974,7 @@ public SaveDatafgun(id) //儲存永久物品資料
 	new wjsl = get_playersnum(0)
 	if(wjsl < 4)
 	{
-		client_printc(id, "\t由于玩家数量小于 4 人, 你的武器数据不会被保存.")
+		ColorChat(id, RED, "由于玩家数量小于 4 人, 你的武器数据不会被保存.")
 		return PLUGIN_HANDLED
 	}
 
@@ -889,6 +988,11 @@ public SaveDatafgun(id) //儲存永久物品資料
 		dbi_query(sql, "UPDATE bb_weapons SET %s='%d' WHERE name = '%s'", pri_gun_code[i], g_iForeverGun[id][i], authid)
 	}
 	
+	for(new i=1;i<sizeof pri_gun_code_hp;i++)
+	{
+		dbi_query(sql, "UPDATE bb_weapons_hp SET %s='%d' WHERE name = '%s'", pri_gun_code_hp[i], g_iForeverGunHP[id][i], authid)
+	}
+	
 	for(new i=1;i<sizeof sec_gun_code;i++)
 	{
 		dbi_query(sql, "UPDATE bb_weapons_sec SET %s='%d' WHERE name = '%s'", sec_gun_code[i], g_iForeverHandGun[id][i], authid)
@@ -900,6 +1004,7 @@ public SaveDatafgun(id) //儲存永久物品資料
 public LoadDatafgun(id) //載入永久物品資料
 { 
 	LoadPriFGun(id)
+	LoadPriFGunHP(id)
 	LoadSecFGun(id)
 }
 
@@ -925,6 +1030,33 @@ public LoadPriFGun(id)
 		for(new i=1;i<sizeof pri_gun_code;i++)
 		{
 			g_iForeverGun[id][i] = dbi_field(result, i)
+		}
+		dbi_free_result(result)
+	}
+}
+
+public LoadPriFGunHP(id)
+{
+	new authid[32] 
+	get_user_name(id,authid,31)
+	replace_all(authid, 32, "`", "\`")
+	replace_all(authid, 32, "'", "\'")
+
+	result = dbi_query(sql, "SELECT hecate FROM bb_weapons_hp WHERE name='%s'", authid)
+
+	if(result == RESULT_NONE)
+	{
+		dbi_query(sql, "INSERT INTO bb_weapons(name,hecate) VALUES('%s','0')", authid)
+	}
+	else if(result <= RESULT_FAILED)
+	{
+		server_print("[FGunShop] SQL Init error. (Load)")
+	}
+	else
+	{
+		for(new i=1;i<sizeof pri_gun_code_hp;i++)
+		{
+			g_iForeverGunHP[id][i] = dbi_field(result, i)
 		}
 		dbi_free_result(result)
 	}

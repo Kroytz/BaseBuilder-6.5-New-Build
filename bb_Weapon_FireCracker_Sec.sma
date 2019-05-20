@@ -55,7 +55,7 @@ enum
 
 #define OLD_W_MODEL "models/w_deagle.mdl"
 #define WEAPON_EVENT "events/deagle.sc"
-#define WEAPON_SECRETCODE 21321
+#define WEAPON_SECRETCODE 213168
 
 new g_Had_Firecracker[33], g_SpecialShoot[33], g_Old_Weapon[33], Float:g_LastShoot[33]
 new g_firecracker_event, g_ham_bot, g_Exp_SprId, g_Exp2_SprId, g_MF_SprId, g_Trail_SprId
@@ -141,6 +141,7 @@ public Get_Firecracker(id)
 	if(!is_user_alive(id))
 		return
 		
+	drop_weapons(id, 2)
 	g_Had_Firecracker[id] = 1
 	g_SpecialShoot[id] = 0
 	
@@ -376,14 +377,14 @@ public fw_Item_AddToPlayer_Post(ent, id)
 	}		
 	
 	message_begin(MSG_ONE_UNRELIABLE, get_user_msgid("WeaponList"), .player = id)
-	write_string(g_Had_Firecracker[id] == 1 ? "weapon_firecracker" : "weapon_m4a1")
+	write_string(g_Had_Firecracker[id] == 1 ? "weapon_firecracker" : "weapon_deagle")
 	write_byte(8) // PrimaryAmmoID
 	write_byte(35) // PrimaryAmmoMaxAmount
 	write_byte(-1) // SecondaryAmmoID
 	write_byte(-1) // SecondaryAmmoMaxAmount
 	write_byte(1) // SlotID (0...N)
 	write_byte(1) // NumberInSlot (1...N)
-	write_byte(g_Had_Firecracker[id] == 1 ? CSW_FIRECRACKER : CSW_M4A1) // WeaponID
+	write_byte(g_Had_Firecracker[id] == 1 ? CSW_FIRECRACKER : CSW_DEAGLE) // WeaponID
 	write_byte(0) // Flags
 	message_end()
 
@@ -608,10 +609,15 @@ public Check_RadiusDamage(Ent, Id)
 			continue
 		if(i == Attacker)
 			continue
+		if(get_user_team(Attacker) == get_user_team(i))
+			continue
 		if(entity_range(Ent, i) > float(RADIUS))
 			continue
+		if(pev(i,pev_takedamage) == DAMAGE_NO)
+			continue
 			
-		ExecuteHamB(Ham_TakeDamage, i, 0, Attacker, float(DAMAGE), DMG_BLAST)
+		set_pdata_float(i, 108, 0.9)
+		ExecuteHamB(Ham_TakeDamage, i, 0, Attacker, float(DAMAGE), DMG_BULLET)
 	}
 }
 
@@ -679,4 +685,17 @@ stock set_player_nextattack(id, Float:nexttime)
 		return
 		
 	set_pdata_float(id, 83, nexttime, 5)
+}
+
+stock drop_weapons(iPlayer, Slot)
+{
+	new item = get_pdata_cbase(iPlayer, 367+Slot, 4)
+	while(item > 0)
+	{
+		static classname[24]
+		pev(item, pev_classname, classname, charsmax(classname))
+		engclient_cmd(iPlayer, "drop", classname)
+		item = get_pdata_cbase(item, 42, 5)
+	}
+	set_pdata_cbase(iPlayer, 367, -1, 4)
 }

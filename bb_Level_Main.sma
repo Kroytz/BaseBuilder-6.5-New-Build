@@ -10,6 +10,7 @@
 #include <dhudmessage>
 #include <basebuilder>
 #include <eg_boss>
+#include <ColorChat_>
 
 native zp_donater_get_level(id)
 
@@ -27,7 +28,6 @@ enum
 	JOB_MAGICAL
 }
 
-new const is_used_skill[][] = { "[可使用]", "[冷却中]" }
 new const szJobName[][] = { "未选择", "武器专家 | 按'R'使用技能" , "刺客 | 按'R'使用技能", "魔法师 | 按'R'使用技能" }
 
 // --- Job System Const & Variables
@@ -58,16 +58,37 @@ new const MAXCLIP[] = { -1, 13, -1, 10, 1, 7, -1, 30, 30, 1, 30, 20, 25, 30, 35,
 new g_has_unlimited_clip[33], g_uccountingdown[33]
 
 // -- Killer 刺客
-new const killer_skills[][] = { "null", "隐刃" }
-new const killer_skills_info[][] = { "null", "隐身 5 秒(可用1+等级次)" }
-new const killer_skills_cost[] = { 0, 50 }
-new const killer_initskill[][] = { "null", "隐刃" }
+new const killer_skills[][] = { "null", "[主动]隐刃", "[主动]疾步", "[被动]锋芒" }
+new const killer_skills_info[][] = { "null", "隐身 5 秒(可用1+等级次)", "加速 5 秒(可用1+等级次)", "每级增加刀伤害 150 点(基础伤害1000)" }
+new const killer_skills_cost[] = { 0, 50, 50, 100 }
+new const killer_initskill[][] = { "null", "隐刃", "疾步" }
+
+#define DMG_KNIFE ( DMG_BULLET | DMG_NEVERGIB )
+
+enum
+{
+	SKILL_INVIS = 1, // 隐刃
+	SKILL_SPEED,  // 疾步
+	SKILL_KNIFEDMG // 锋芒
+}
 
 // -- Enchanter 魔法师
-new const magical_skills[][] = { "null", "null" }
-new const magical_skills_info[][] = { "null", "null" }
-new const magical_skills_cost[] = { 0, 999 }
-new const magical_initskill[][] = { "null", "焰环" }
+new const magical_skills[][] = { "null", "[主动]防御力场", "[主动]红莲之焰", "[被动]寒能积蓄" }
+new const magical_skills_info[][] = { "null", "弹飞附近僵尸", "燃烧 400.0 范围僵尸 10 秒", "每隔 70-等级 秒获得一颗冰冻弹" }
+new const magical_skills_cost[] = { 0, 999, 100, 20 }
+new const magical_initskill[][] = { "null", "防御力场", "红莲之焰" }
+
+enum
+{
+	SKILL_AURA = 1, // 防御立场
+	SKILL_RADIUSFIRE,  // 红莲之焰
+	SKILL_FROSTGAIN // 寒能积蓄
+}
+
+enum (+= 2333)
+{
+	TASKID_FROSTGAIN = 161813 // 寒能积蓄
+}
 
 // -- Max Upgrade Level Settings
 #define MaxLevel_Health		50
@@ -117,7 +138,16 @@ new const log_file[] = "BB_AdminsDoWt.txt"
 // -- 2018/08/07 Restart Project
 new iPlayerJob[33]
 new iPlayerJobSkill[33][4]
-new iPlayerMainSkillUsed[33]
+new iPlayerMainSkillUsed[33][3]
+
+new g_iSprShockWave, g_iSprBeam
+enum OBJECTTYPE // Aura
+{
+	OBJECT_GENERIC,
+	OBJECT_GRENADE,
+	OBJECT_PLAYER,
+	OBJECT_ARMOURY
+}
 
 // -- Fuck Nvault, SQL Support
 new Sql:sql
@@ -133,8 +163,10 @@ public plugin_init()
     register_plugin(PLUGIN, VERSION, AUTHOR)
 	
 	// -- Client Commands
+	/* 用你妈clcmd 老子Hook Cmdstart
 	register_clcmd("drop", "cmdHumanSkill")
 	register_clcmd("hm_skill", "cmdHumanSkill")
+	*/
 	
 	register_clcmd("say /save", "savecmd")
 	register_clcmd("savedata", "savecmd")
@@ -210,6 +242,12 @@ public plugin_init()
 	}
 }
 
+public plugin_precache()
+{
+	g_iSprShockWave = engfunc(EngFunc_PrecacheModel, "sprites/shockwave.spr")
+	g_iSprBeam = engfunc(EngFunc_PrecacheModel, "sprites/lgtning.spr")
+}
+
 public plugin_natives()
 {
     register_native("get_user_cash", "native_get_user_cash", 1)
@@ -231,7 +269,14 @@ public ev_ResetHud(id)
 	function(id)
 	g_damage[id] = 0
 	g_RoundDamage[id] = 0
-	iPlayerMainSkillUsed[id] = 0
+	iPlayerMainSkillUsed[id][1] = 0
+	iPlayerMainSkillUsed[id][2] = 0
+	
+	if(iPlayerJob[id] == JOB_MAGICAL && iPlayerJobSkill[id][SKILL_FROSTGAIN] > 0)
+	{
+		remove_task(id + TASKID_FROSTGAIN)
+		Task_Frostgain(id)
+	}
 }
 
 public ev_RoundStart()
@@ -311,10 +356,8 @@ public cmdHumanSkill(id)
 			new szTempid[32]
 			for(new i = 1; i < sizeof weaponer_initskill; i++)
 			{
-				new iSkillUsed = iPlayerMainSkillUsed[id]
-				
 				new szItems[101]
-				formatex(szItems, 100, "\y%s - \r%s", weaponer_initskill[i], is_used_skill[iSkillUsed])
+				formatex(szItems, 100, "\y%s - \r[余 %d 次]", weaponer_initskill[i], 1 - iPlayerMainSkillUsed[id][i])
 				num_to_str(i, szTempid, 31)
 				menu_additem(menu, szItems, szTempid, 0)
 			}
@@ -324,10 +367,19 @@ public cmdHumanSkill(id)
 			new szTempid[32]
 			for(new i = 1; i < sizeof killer_initskill; i++)
 			{
-				new iSkillUsed = iPlayerMainSkillUsed[id]
-				
 				new szItems[101]
-				formatex(szItems, 100, "\y%s - \r%s", killer_initskill[i], is_used_skill[iSkillUsed])
+				formatex(szItems, 100, "\y%s - \r%s[余 %d 次]", killer_initskill[i], iPlayerJobSkill[id][i] - iPlayerMainSkillUsed[id][i])
+				num_to_str(i, szTempid, 31)
+				menu_additem(menu, szItems, szTempid, 0)
+			}
+		}
+		else if(iPlayerJob[id] == JOB_MAGICAL)
+		{
+			new szTempid[32]
+			for(new i = 1; i < sizeof magical_initskill; i++)
+			{
+				new szItems[101]
+				formatex(szItems, 100, "\y%s - \r[余 %d 次]", magical_initskill[i], iPlayerJobSkill[id][i] - iPlayerMainSkillUsed[id][i])
 				num_to_str(i, szTempid, 31)
 				menu_additem(menu, szItems, szTempid, 0)
 			}
@@ -369,30 +421,85 @@ public init_skill_menu_handler(id, menu, item)
 
 public Use_Init_Skill(id, skillid)
 {
-	if(zp_get_user_zombie(id) || !is_user_alive(id))
+	if(zp_get_user_zombie(id) || !is_user_alive(id) || skillid > 2)
 		return PLUGIN_HANDLED;
 
-	if(iPlayerJob[id] == JOB_WEAPONER)
+	switch(skillid)
 	{
-		if(iPlayerMainSkillUsed[id] <= 0)
+		case 1:
 		{
-			client_printc(id, "\g[职业技能] \t<无尽怒火> \y已发动! %d 秒后结束.", 5 + iPlayerJobSkill[id][SKILL_UAMMO])
-			g_uccountingdown[id] = 5 + iPlayerJobSkill[id][SKILL_UAMMO]
-			g_has_unlimited_clip[id] = true
-			uammo_countdown(id + TASK_INIT_SKILL)
-			iPlayerMainSkillUsed[id] = 1
+			/* 技能1：
+			武器专家 - 无尽怒火
+			刺客 - 隐刃
+			魔法师 - 防御力场 */
+			
+			if(iPlayerJob[id] == JOB_WEAPONER)
+			{
+				if(iPlayerMainSkillUsed[id][SKILL_UAMMO] <= 0)
+				{
+					ColorChat(id, BLUE, "[无尽怒火] 已发动! %d 秒后结束.", 5 + iPlayerJobSkill[id][SKILL_UAMMO])
+					g_uccountingdown[id] = 5 + iPlayerJobSkill[id][SKILL_UAMMO]
+					g_has_unlimited_clip[id] = true
+					uammo_countdown(id + TASK_INIT_SKILL)
+					iPlayerMainSkillUsed[id][SKILL_UAMMO] = 1
+				}
+				else ColorChat(id, BLUE, "技能使用次数已到上限!")
+			}
+			else if(iPlayerJob[id] == JOB_KILLER)
+			{
+				if(iPlayerMainSkillUsed[id][SKILL_INVIS] <= iPlayerJobSkill[id][SKILL_INVIS])
+				{
+					ColorChat(id, BLUE, "[隐刃] 已发动! 5 秒后结束.")
+					ColorChat(id, BLUE, "!! 请不要重复使用技能, 会无效 !!")
+					set_user_rendering(id, kRenderFxGlowShell, 0, 0, 0, kRenderTransAlpha, 0)
+					set_task(5.0, "Invis_Skillend", id + TASK_INIT_SKILL)
+					iPlayerMainSkillUsed[id][SKILL_INVIS] ++
+				}
+				else ColorChat(id, BLUE, "技能使用次数已到上限!")
+			}
+			else if(iPlayerJob[id] == JOB_MAGICAL)
+			{
+				if(iPlayerMainSkillUsed[id][SKILL_AURA] <= iPlayerJobSkill[id][SKILL_AURA])
+				{
+					ColorChat(id, BLUE, "[防御力场] 已发动!")
+					Aura_Explode(id)
+					iPlayerMainSkillUsed[id][SKILL_AURA] ++
+				}
+				else ColorChat(id, BLUE, "技能使用次数已到上限!")
+			}
+		}
+		case 2:
+		{
+			/* 技能2：
+			武器专家 - 无
+			刺客 - 疾步
+			魔法师 - 红莲之焰 */
+			
+			if(iPlayerJob[id] == JOB_KILLER)
+			{
+				if(iPlayerMainSkillUsed[id][SKILL_SPEED] <= iPlayerJobSkill[id][SKILL_SPEED])
+				{
+					ColorChat(id, BLUE, "[疾步] 已发动! 5 秒后结束.")
+					ColorChat(id, BLUE, "!! 请不要切枪, 否则无效 !!")
+					set_user_maxspeed(id, 265 * 1.0)
+					set_task(5.0, "Speed_Skillend", id + TASK_INIT_SKILL)
+					iPlayerMainSkillUsed[id][SKILL_SPEED] ++
+				}
+				else ColorChat(id, BLUE, "技能使用次数已到上限!")
+			}
+			else if(iPlayerJob[id] == JOB_MAGICAL)
+			{
+				if(iPlayerMainSkillUsed[id][SKILL_RADIUSFIRE] <= iPlayerJobSkill[id][SKILL_RADIUSFIRE])
+				{
+					ColorChat(id, BLUE, "[红莲之焰] 已发动!")
+					Radius_Burn(id)
+					iPlayerMainSkillUsed[id][SKILL_RADIUSFIRE] ++
+				}
+				else ColorChat(id, BLUE, "技能使用次数已到上限!")
+			}
 		}
 	}
-	else if(iPlayerJob[id] == JOB_KILLER)
-	{
-		if(iPlayerMainSkillUsed[id] <= iPlayerJobSkill[id][1])
-		{
-			client_printc(id, "\g[职业技能] \t<隐刃> \y已发动! 5 秒后结束.")
-			fm_set_rendering(id, kRenderFxGlowShell, 0, 0, 0, kRenderTransAlpha, 0)
-			set_task(5.0, "Invis_Skillend", id + TASK_INIT_SKILL)
-			iPlayerMainSkillUsed[id] ++
-		}
-	}
+	
 	return PLUGIN_HANDLED;
 }
 
@@ -402,6 +509,14 @@ public Invis_Skillend(taskid)
 {
 	new id = taskid - TASK_INIT_SKILL
 	fm_set_rendering(id, kRenderFxNone, kRenderNormal)
+	ColorChat(id, BLUE, "!! [隐刃] 效果已结束 !!")
+}
+
+public Speed_Skillend(taskid)
+{
+	new id = taskid - TASK_INIT_SKILL
+	set_user_maxspeed(id, 250 * 1.0)
+	ColorChat(id, BLUE, "!! [疾步] 效果已结束 !!")
 }
 
 public uammo_countdown(taskid)
@@ -418,6 +533,72 @@ public uammo_countdown(taskid)
 	client_print(id, print_center, "无限子弹, 剩余 %d 秒", g_uccountingdown[id])
 	g_uccountingdown[id] --
 	set_task(1.0, "uammo_countdown", id + TASK_INIT_SKILL)
+}
+
+public Aura_Explode(id)
+{
+	static Float:vecOrigin[3]; pev(id, pev_origin, vecOrigin)
+	genericShock(vecOrigin, 120.0, "player", 32, 100.0, OBJECT_PLAYER)
+    
+    engfunc(EngFunc_MessageBegin, MSG_BROADCAST, SVC_TEMPENTITY, vecOrigin)
+    write_byte(TE_BEAMCYLINDER)
+    engfunc(EngFunc_WriteCoord, vecOrigin[0])
+    engfunc(EngFunc_WriteCoord, vecOrigin[1])
+    engfunc(EngFunc_WriteCoord, vecOrigin[2])
+    engfunc(EngFunc_WriteCoord, vecOrigin[0])
+    engfunc(EngFunc_WriteCoord, vecOrigin[1])
+    engfunc(EngFunc_WriteCoord, vecOrigin[2] + 200.0)
+    write_short(g_iSprShockWave)
+    write_byte(0) // Start Frame
+    write_byte(20) // Framerate
+    write_byte(4) // Live Time
+    write_byte(10) // Width
+    write_byte(10) // Noise
+    write_byte(0) // R
+    write_byte(255) // G
+    write_byte(255) // B
+    write_byte(255) // Bright
+    write_byte(9) // Speed
+    message_end()
+    
+    engfunc(EngFunc_MessageBegin, MSG_BROADCAST, SVC_TEMPENTITY, vecOrigin)
+    write_byte(TE_BEAMCYLINDER)
+    engfunc(EngFunc_WriteCoord, vecOrigin[0])
+    engfunc(EngFunc_WriteCoord, vecOrigin[1])
+    engfunc(EngFunc_WriteCoord, vecOrigin[2])
+    engfunc(EngFunc_WriteCoord, vecOrigin[0])
+    engfunc(EngFunc_WriteCoord, vecOrigin[1])
+    engfunc(EngFunc_WriteCoord, vecOrigin[2] + 200.0)
+    write_short(g_iSprShockWave)
+    write_byte(0) // Start Frame
+    write_byte(10) // Framerate
+    write_byte(4) // Live Time
+    write_byte(10) // Width
+    write_byte(20) // Noise
+    write_byte(0) // R
+    write_byte(255) // G
+    write_byte(0) // B
+    write_byte(150) // Bright
+    write_byte(9) // Speed
+    message_end() 
+
+	return PLUGIN_HANDLED
+}
+
+public Radius_Burn(id)
+{
+	static Float:vecOrigin[3]; pev(id, pev_origin, vecOrigin)
+	ExplodeEffect(vecOrigin, 200, 0, 0)
+	LightEffect(vecOrigin, 200, 0, 0)
+	
+	new pEntity = -1
+	while((pEntity = engfunc(EngFunc_FindEntityInSphere, pEntity, vecOrigin, 400.0)) && pev_valid(pEntity))
+	{
+		if(!is_user_alive(pEntity) || !zp_get_user_zombie(pEntity))
+			continue;
+
+		z4e_burn_set(pEntity, 10.0, 1)
+	}
 }
 
 public cmd_give_exp(id, level, cid) 
@@ -720,7 +901,7 @@ public SaveData(id)
 	new wjsl = get_playersnum(0)
 	if(wjsl < 4)
 	{
-		client_printc(id, "\t由于玩家数量小于 4 人, 你的等级数据不会被保存.")
+		ColorChat(id, RED, "由于玩家数量小于 4 人, 你的等级数据不会被保存.")
 		return PLUGIN_HANDLED
 	}
 
@@ -895,6 +1076,19 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 				}
 			}
 		}
+		else if(iPlayerJob[attacker] == JOB_KILLER)
+		{
+			if(iPlayerJobSkill[attacker][SKILL_KNIFEDMG] > 0)
+			{
+				if((get_user_weapon(attacker, _, _) == CSW_KNIFE) && (damage_type & DMG_KNIFE) && damage >= 65.0)
+				{
+					new Float:NewDamage = (float(iPlayerJobSkill[attacker][SKILL_KNIFEDMG] - 1) * 150.0) + 1000.0
+					damage = NewDamage
+					client_printc(attacker, "\g[职业技能] \t<锋芒> \y已触发! 对目标造成 \t%d \y点伤害.", floatround(NewDamage))
+					client_printc(victim, "\t你被 [刺客] 捅了一刀! 他对你造成了 %d 点伤害.", floatround(NewDamage))
+				}
+			}
+		}
 	
 		SetHamParamFloat( 4, damage * (1.0 + (Damage_PerLevel * float(g_DamageLevel[attacker])) ) + float(g_BattleLvl[attacker]))
 	
@@ -934,6 +1128,37 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 	
     return HAM_IGNORED
 }
+
+// 寒能积蓄
+public Task_Frostgain(id)
+{
+	if(iPlayerJobSkill[id][SKILL_FROSTGAIN] > 0)
+	{
+		set_task(70.0 - float(iPlayerJobSkill[id][SKILL_FROSTGAIN]), "Give_Flash" ,id + TASKID_FROSTGAIN)
+		ColorChat(id, BLUE, "[被动: 寒能积蓄]发动! 每 %2.1f 秒补给一颗冰冻弹.", 70.0 - float(iPlayerJobSkill[id][SKILL_FROSTGAIN]))
+	}
+}
+
+public Give_Flash(taskid)
+{
+	remove_task(taskid)
+	new id = taskid - TASKID_FROSTGAIN
+	
+	new Flash = cs_get_user_bpammo(id, CSW_FLASHBANG)
+	new Float:timer = 70.0 - float(iPlayerJobSkill[id][SKILL_FROSTGAIN])
+	
+	if(Flash < 1)
+	{
+		if(!Flash)
+		{
+			give_item (id, "weapon_flashbang")
+		}else{
+			cs_set_user_bpammo(id, CSW_FLASHBANG, cs_get_user_bpammo(id, CSW_FLASHBANG) + 1)
+		}
+	}
+	set_task(timer,"Give_Flash", taskid)
+}
+		
 
 public fw_PlayerKilled(victim, attacker, shouldgib) 
 {
@@ -990,7 +1215,7 @@ public cmdChooseteam(id)
 			return PLUGIN_HANDLED;
 		}
 
-		new menu = menu_create("\r基地建设升级 v1.2 - 0117^n制作：CyberTech Dev Team.", "menu_handler");
+		new menu = menu_create("\r基地建设升级 v1.5 Fin.A^n制作：CyberTech Dev Team.", "menu_handler");
 				
 		menu_additem(menu, "等级系统", "1", 0);
 		menu_additem(menu, "道具商城", "2", 0);
@@ -1190,9 +1415,8 @@ public fshop_menu(id)
 		new menu = menu_create("\r永久商城", "fshop_handler");
 				
 		menu_additem(menu, "\y永久枪", "1", 0);
-		menu_additem(menu, "\y高玩枪", "2", 0);
-		menu_additem(menu, "\y副武器", "3", 0);
-		menu_additem(menu, "\y特殊物品^n^n", "4", 0);
+		menu_additem(menu, "\y高玩枪^n", "2", 0);
+		menu_additem(menu, "\y副武器^n^n", "3", 0);
 		menu_additem(menu, "返回主菜单", "6", 0);
 		
 		menu_setprop(menu, MPROP_NUMBER_COLOR, "\r"); 
@@ -1239,10 +1463,6 @@ public fshop_handler(id, menu, item)
 		case 3:
 		{
                         client_cmd(id, "fshophandgun")
-		}
-		case 4:
-		{
-                        client_cmd(id, "fshopother")
 		}
 		case 6:
 		{
@@ -2362,4 +2582,142 @@ stock client_printc(const id, const string[], {Float, Sql, Resul,_}:...)
 stock fm_set_weapon_ammo(entity, amount)
 {
 	set_pdata_int(entity, OFFSET_CLIPAMMO, amount, OFFSET_LINUX_WEAPONS);
+}
+
+genericShock(Float:hitPointOrigin[3], Float:radius, classString[], maxEntsToFind, Float:power, OBJECTTYPE:objecttype)
+{ 
+	new entList[32]
+	if (maxEntsToFind > 32)
+		maxEntsToFind = 32
+
+	new entsFound = find_sphere_class(0, classString, radius, entList, maxEntsToFind, hitPointOrigin)
+
+	new Float:entOrigin[3]
+	new Float:velocity[3]
+	new Float:cOrigin[3]
+
+	for (new j = 0; j < entsFound; j++) 
+	{
+		switch (objecttype) 
+		{
+			case OBJECT_PLAYER: 
+			{
+				if (!is_user_alive(entList[j]))
+				continue
+			}
+			case OBJECT_GRENADE: 
+			{
+				new l_model[16]
+				entity_get_string(entList[j], EV_SZ_model, l_model, 15)
+				if (equal(l_model, "models/w_c4.mdl")) 
+				continue
+			}
+		}
+		
+		if(!zp_get_user_zombie(entList[j]))
+			continue;
+		
+		entity_get_vector(entList[j], EV_VEC_origin, entOrigin) 
+		new Float:distanceNadePl = vector_distance(entOrigin, hitPointOrigin)
+		if (entity_is_on_ground(entList[j]) && entOrigin[2] < hitPointOrigin[2])
+		entOrigin[2] = hitPointOrigin[2] + distanceNadePl
+		entity_get_vector(entList[j], EV_VEC_velocity, velocity)
+		cOrigin[0] = (entOrigin[0] - hitPointOrigin[0]) * radius / distanceNadePl + hitPointOrigin[0]
+		cOrigin[1] = (entOrigin[1] - hitPointOrigin[1]) * radius / distanceNadePl + hitPointOrigin[1]
+		cOrigin[2] = (entOrigin[2] - hitPointOrigin[2]) * radius / distanceNadePl + hitPointOrigin[2]
+		velocity[0] += (cOrigin[0] - entOrigin[0]) * power
+		velocity[1] += (cOrigin[1] - entOrigin[1]) * power
+		velocity[2] += (cOrigin[2] - entOrigin[2]) * power
+		entity_set_vector(entList[j], EV_VEC_velocity, velocity)
+	}
+}
+
+stock entity_is_on_ground(entity) {
+	return entity_get_int(entity, EV_INT_flags) & FL_ONGROUND
+}
+
+// From z4e
+ExplodeEffect(Float:vecOrigin[3], r, g, b)
+{
+	// Smallest ring
+	engfunc(EngFunc_MessageBegin, MSG_PVS, SVC_TEMPENTITY, vecOrigin, 0)
+	write_byte(TE_BEAMCYLINDER) // TE id
+	engfunc(EngFunc_WriteCoord, vecOrigin[0]) // x
+	engfunc(EngFunc_WriteCoord, vecOrigin[1]) // y
+	engfunc(EngFunc_WriteCoord, vecOrigin[2]) // z
+	engfunc(EngFunc_WriteCoord, vecOrigin[0]) // x axis
+	engfunc(EngFunc_WriteCoord, vecOrigin[1]) // y axis
+	engfunc(EngFunc_WriteCoord, vecOrigin[2]+385.0) // z axis
+	write_short(g_iSprBeam) // sprite
+	write_byte(0) // startframe
+	write_byte(0) // framerate
+	write_byte(15) // life
+	write_byte(60) // width
+	write_byte(0) // noise
+	write_byte(r) // red
+	write_byte(g) // green
+	write_byte(b) // blue
+	write_byte(200) // brightness
+	write_byte(0) // speed
+	message_end()
+	
+	// Medium ring
+	engfunc(EngFunc_MessageBegin, MSG_PVS, SVC_TEMPENTITY, vecOrigin, 0)
+	write_byte(TE_BEAMCYLINDER) // TE id
+	engfunc(EngFunc_WriteCoord, vecOrigin[0]) // x
+	engfunc(EngFunc_WriteCoord, vecOrigin[1]) // y
+	engfunc(EngFunc_WriteCoord, vecOrigin[2]) // z
+	engfunc(EngFunc_WriteCoord, vecOrigin[0]) // x axis
+	engfunc(EngFunc_WriteCoord, vecOrigin[1]) // y axis
+	engfunc(EngFunc_WriteCoord, vecOrigin[2]+470.0) // z axis
+	write_short(g_iSprBeam) // sprite
+	write_byte(0) // startframe
+	write_byte(0) // framerate
+	write_byte(15) // life
+	write_byte(60) // width
+	write_byte(0) // noise
+	write_byte(r) // red
+	write_byte(g) // green
+	write_byte(b) // blue
+	write_byte(200) // brightness
+	write_byte(0) // speed
+	message_end()
+	
+	// Largest ring
+	engfunc(EngFunc_MessageBegin, MSG_PVS, SVC_TEMPENTITY, vecOrigin, 0)
+	write_byte(TE_BEAMCYLINDER) // TE id
+	engfunc(EngFunc_WriteCoord, vecOrigin[0]) // x
+	engfunc(EngFunc_WriteCoord, vecOrigin[1]) // y
+	engfunc(EngFunc_WriteCoord, vecOrigin[2]) // z
+	engfunc(EngFunc_WriteCoord, vecOrigin[0]) // x axis
+	engfunc(EngFunc_WriteCoord, vecOrigin[1]) // y axis
+	engfunc(EngFunc_WriteCoord, vecOrigin[2]+555.0) // z axis
+	write_short(g_iSprBeam) // sprite
+	write_byte(0) // startframe
+	write_byte(0) // framerate
+	write_byte(15) // life
+	write_byte(60) // width
+	write_byte(0) // noise
+	write_byte(r) // red
+	write_byte(g) // green
+	write_byte(b) // blue
+	write_byte(200) // brightness
+	write_byte(0) // speed
+	message_end()
+}
+
+LightEffect(Float:vecOrigin[3], r, g, b)
+{
+	engfunc(EngFunc_MessageBegin, MSG_PVS, SVC_TEMPENTITY, vecOrigin, 0)
+	write_byte(TE_DLIGHT) // TE id
+	engfunc(EngFunc_WriteCoord, vecOrigin[0])
+	engfunc(EngFunc_WriteCoord, vecOrigin[1])
+	engfunc(EngFunc_WriteCoord, vecOrigin[2])
+	write_byte(250) // radius
+	write_byte(r) // red
+	write_byte(g) // green
+	write_byte(b) // blue
+	write_byte(10) // life
+	write_byte(2000) // decay rate
+	message_end()
 }

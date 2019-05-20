@@ -143,9 +143,6 @@ public boss_skill2(id, menu, item)
 	
 		if(g_iBossCountdown[id] >= boss_skill_cost[i])
 		{
-			new name[33]
-			get_user_name(id, name, 32)
-			
 			if(i == 1) skill_godmode(id)
 			else if(i == 2) skill_speed(id)
 			else if(i == 3) skill_ljump(id)
@@ -153,7 +150,7 @@ public boss_skill2(id, menu, item)
 			else if(i == 5) skill_invisible(id)
 			else if(i == 6) skill_pray(id)
 			
-			format(g_msg, charsmax(g_msg), "Combiner「%s」发动技能 %s^n%s", name, boss_skill_name[i], boss_skill_inf[i])
+			format(g_msg, charsmax(g_msg), "Combiner 发动技能 %s^n%s", boss_skill_name[i], boss_skill_inf[i])
 			event_hud(0, 0, 255, 255, g_msg)
 			g_iBossCountdown[id] -= boss_skill_cost[i]
 			
@@ -188,7 +185,7 @@ public skill_speed(id)
 public skill_hjump(id)
 {
 	static Float:velocity[3]
-	velocity_by_aim(id, 100, velocity)
+	pev(id, pev_velocity, velocity)
 	velocity[2] = 3000.0
 	set_pev(id, pev_velocity, velocity)
 	set_user_rendering(id, kRenderFxGlowShell, 255, 0, 0, kRenderNormal, 3)

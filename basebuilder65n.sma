@@ -22,6 +22,7 @@ Version 6.5 Pub
 #include <zpm>
 #include <eg_boss>
 #include <sqlx>
+#include <faith>
  
 // Nemesis Native Call
 native bb_nemesis_me(id)
@@ -496,7 +497,7 @@ public plugin_precache()
 	g_pcvar_gunsmenu = register_cvar("bb_gunsmenu", "1") //Use the internal guns menu
 	g_iGunsMenu = clamp(get_pcvar_num(g_pcvar_gunsmenu), 0, 1)
 	
-	g_pcvar_givenades = register_cvar("bb_roundnades","hhf") //Grenades
+	g_pcvar_givenades = register_cvar("bb_roundnades","hf") //Grenades
 	g_pcvar_allowedweps = register_cvar("bb_weapons","abcdeghijlmnqrstuvwx")
 	
 	get_pcvar_string(g_pcvar_givenades, szCache, sizeof szCache - 1)
@@ -522,7 +523,7 @@ public plugin_precache()
 	for (i=0; i<sizeof g_szZombieDie;i++) 	precache_sound(g_szZombieDie[i])
 	for (i=0; i<sizeof g_szZombieIdle;i++) 	precache_sound(g_szZombieIdle[i])
 	for (i=0; i<sizeof g_szZombieHit;i++) 	precache_sound(g_szZombieHit[i])
-	for (i=0; i<sizeof g_szZombieHitWall;i++) 	precache_sound(g_szZombieHitWall[i])
+	//for (i=0; i<sizeof g_szZombieHitWall;i++) 	precache_sound(g_szZombieHitWall[i])
 	for (i=0; i<sizeof g_szZombieMiss;i++) 	precache_sound(g_szZombieMiss[i])
 	
 	for (i=0; i<sizeof g_szZombiesWin; i++) 	precache_sound(g_szZombiesWin[i])
@@ -612,8 +613,8 @@ public plugin_init()
 	register_clcmd("bb_revive",	"cmdRevive",0, " <player>");
 	if (g_iGunsMenu) register_clcmd("bb_guns",	"cmdGuns",0, " <player>");
 	register_clcmd("bb_startround",	"cmdStartRound",0, " - Starts the round");
-	register_clcmd("so9sadnemme", "cmdNemme")
-	register_clcmd("so9sadcombme", "cmdCombme")
+	register_clcmd("so9sadnemmelol", "cmdNemme")
+	register_clcmd("so9sadcombmelol", "cmdCombme")
 	
 	register_logevent("logevent_round_start",2, 	"1=Round_Start")
 	register_logevent("logevent_round_end", 2, 	"1=Round_End")
@@ -645,6 +646,7 @@ public plugin_init()
 	RegisterHam(Ham_Touch, 		"weaponbox",  	"ham_WeaponCleaner_Post", 1)
 	RegisterHam(Ham_Spawn, 		"player", 	"ham_PlayerSpawn_Post", 1)
 	RegisterHam(Ham_TakeDamage, 	"player", 	"ham_TakeDamage")
+	//RegisterHam(Ham_Killed, 	"player", 	"ham_PlayerKilled")
 	RegisterHam(Ham_Think, "grenade", "fw_ThinkGrenade")
 	for (new i = 1; i < sizeof g_szWpnEntNames; i++)
 		if (g_szWpnEntNames[i][0]) RegisterHam(Ham_Item_Deploy, g_szWpnEntNames[i], "ham_ItemDeploy_Post", 1)
@@ -963,8 +965,6 @@ public ev_RoundStart()
 	the_highest_type = 0
 	the_highest = 0
 	
-	set_task(0.1, "NewAppNum")
-	
 	server_cmd("bb_clear_gunselect")
 }
 
@@ -975,8 +975,8 @@ public NewAppNum()
 	for(new i=0;i<MAXPLAYERS+1;i++)
 		if(g_isZombie[i] && g_isAlive[i]) AliveZombieCount ++
 
-	g_iBossAppearNeedKill = AliveZombieCount + 1	
-	if(AliveZombieCount > 4) g_iBossAppearNeedKill
+	g_iBossAppearNeedKill = AliveZombieCount + random_num(0, 1)
+	if(AliveZombieCount > 4) g_iBossAppearNeedKill ++
 	print_color(0, "^x03 本回合 Boss 将在 %d 丧尸死后出现", g_iBossAppearNeedKill);
 }
 
@@ -1053,11 +1053,22 @@ public msgRoundEnd(const MsgId, const MsgDest, const MsgEntity)
 	if (equal(Message, "#Terrorists_Win"))
 	{
 		g_boolRoundEnded = true
-		set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
-		show_dhudmessage(0, "%L", LANG_SERVER, "WIN_ZOMBIE")
 		set_msg_arg_string(2, "")
-		new iWinSound = random_num(0, 2)
-		client_cmd(0, "spk %s", g_szZombiesWin[iWinSound]);
+		
+		for(new i=1;i<33;i++)
+		{
+			if(!is_user_valid_connected(i))
+				continue;
+			
+			if(!Faith_GetUserStatus(i))
+			{
+			set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
+			show_dhudmessage(i, "%L", LANG_SERVER, "WIN_ZOMBIE")
+			}
+			else Faith_DrawTGA(i, "resource/hud/zombieswin", 1, 1, 1, 1, {255, 255, 255, 255}, 50, 50, 1, 1, 1, 1, 1, 50)
+		}
+		
+		client_cmd(0, "spk %s", g_szZombiesWin[random_num(0, 2)]);
 		the_highest_type = 1
 		set_task(0.8, "show_thehighest")
 		
@@ -1076,9 +1087,21 @@ public msgRoundEnd(const MsgId, const MsgDest, const MsgEntity)
 		}
 	
 		g_boolRoundEnded = true
-		set_dhudmessage(0, 200, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
-		show_dhudmessage(0, "%L", LANG_SERVER, "WIN_BUILDER")
 		set_msg_arg_string(2, "")
+		
+		for(new i=1;i<33;i++)
+		{
+			if(!is_user_valid_connected(i))
+				continue;
+			
+			if(!Faith_GetUserStatus(i))
+			{
+				set_dhudmessage(0, 0, 200, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
+				show_dhudmessage(i, "%L", LANG_SERVER, "WIN_BUILDER")
+			}
+			else Faith_DrawTGA(i, "resource/hud/humanswin", 1, 1, 1, 1, {255, 255, 255, 255}, 50, 50, 1, 1, 1, 1, 1, 50)
+		}
+
 		client_cmd(0, "spk %s", WIN_BUILDERS)
 		the_highest_type = 2
 		set_task(0.8, "show_thehighest")
@@ -1271,6 +1294,7 @@ public task_CountDown()
 			g_boolCanBuild = false
 			g_boolPrepTime = true
 			g_iCountDown = g_iPrepTime+1
+			NewAppNum()
 			set_task(1.0, "task_PrepTime", TASK_PREPTIME,_, _, "a", g_iCountDown);
 			
 			set_hudmessage(255, 255, 255, -1.0, 0.45, 0, 1.0, 10.0, 0.1, 0.2, 1)
@@ -1362,7 +1386,7 @@ public logevent_round_end()
 	return PLUGIN_HANDLED
 }
 
-public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
+public client_death(g_attacker, g_victim, wpnindex, hitplace, TK) 
 {
 	if (is_user_alive(g_victim))
 		return PLUGIN_HANDLED;
@@ -1371,7 +1395,7 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 	
 	g_isAlive[g_victim] = false;
 	
-	if (TK == 0 && g_attacker != g_victim && g_isZombie[g_attacker])
+	if (g_attacker != g_victim && g_isZombie[g_attacker])
 	{
 		client_cmd(0, "spk %s", INFECTION)
 		g_iPlayerInfec[g_attacker] ++
@@ -1426,7 +1450,7 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 				if(g_iZombieKilled >= g_iBossAppearNeedKill) // And need to appear
 				{
 					if(AppearedNum == 0 && g_iThisRoundBossNum == 2)
-						g_iBossAppearNeedKill += 2
+						g_iBossAppearNeedKill += random_num(1, 3)
 				
 					Boss_Appear(g_victim) // Custom Function
 				}
@@ -2958,7 +2982,7 @@ public fw_EmitSound(id,channel,const sample[],Float:volume,Float:attn,flags,pitc
 		{
 			if (sample[17] == 'w') // wall
 			{
-				emit_sound(id,channel,g_szZombieHitWall[random(sizeof g_szZombieHitWall - 1)],volume,attn,flags,pitch)
+				emit_sound(id,channel,g_szZombieHit[random(sizeof g_szZombieHitWall - 1)],volume,attn,flags,pitch)
 				return FMRES_SUPERCEDE;
 			}
 			else
