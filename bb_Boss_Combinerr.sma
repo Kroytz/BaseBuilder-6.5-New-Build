@@ -15,7 +15,7 @@
 native zp_override_user_model(id, const newmodel[], modelindex = 0)
 
 new const boss_skill_name[][] = { "", "【无敌】", "【暴走】", "【长跳】", "【高跳】", "【隐身】", "【祈愿】" }
-new const boss_skill_inf[][] = { "", "免疫所有伤害 5 秒", "短时间内速度暴增", "往准心方向飞扑", "向上飞超高距离", "隐身 5 秒", "所有僵尸恢复 2500 血量" }
+new const boss_skill_inf[][] = { "", "免疫所有伤害 3 秒", "短时间内速度暴增", "往准心方向飞扑", "向上飞超高距离", "隐身 5 秒", "所有僵尸恢复 2500 血量" }
 new const boss_skill_cost[] = { 0, 555, 333, 333, 444, 555, 666 }
 new const boss_skill_sound[][] = { "", "basebuilder/FAITH/nemesis/nemesisgodmode.wav", "basebuilder/FAITH/nemesis/nemesisgodmode.wav", "basebuilder/FAITH/Hunter_LJump1.wav", "basebuilder/FAITH/Hunter_LJump1.wav", "", "basebuilder/FAITH/Zombie_Regain.wav" }
 
@@ -53,9 +53,15 @@ public plugin_precache()
 public plugin_natives()
 {
 	register_native("bb_combiner_me", "Native_Become_Nemesis", 1)
+	register_native("bb_combiner_addreload", "Native_Addreload", 1)
 }
 
 public Native_Become_Nemesis(id) Become_Boss(id)
+public Native_Addreload(id, iAmount)
+{
+	if(g_iBossCountdown[id] < 888)
+		g_iBossCountdown[id] += iAmount
+}
 
 public Become_Boss(id)
 {
@@ -73,7 +79,7 @@ public Become_Boss(id)
 	cs_set_user_armor(id, 500, CS_ARMOR_VESTHELM);
 	
 	set_user_health(id, ict * 10125 + 2500)
-	set_user_maxspeed(id, 270 * 1.0)
+	set_user_maxspeed(id, 275.0)
 	set_user_gravity(id, 0.8)
 }
 
@@ -169,7 +175,7 @@ public skill_godmode(id)
 	
 	set_user_godmode(id, 1)
 	set_user_rendering(id, kRenderFxGlowShell, 0, 255, 255, kRenderNormal, 3)
-	set_task(5.0, "off_skill", id + TASK_OFF_SKILL)
+	set_task(3.0, "off_skill", id + TASK_OFF_SKILL)
 }
 
 public skill_speed(id)
@@ -177,7 +183,7 @@ public skill_speed(id)
 	new name[33]
 	get_user_name(id, name, 32)
 
-	set_user_maxspeed(id, 270 * 1.5)
+	set_user_maxspeed(id, 300.0)
 	set_user_rendering(id, kRenderFxGlowShell, 128, 128, 0, kRenderNormal, 3)
 	set_task(5.0, "off_skill", id + TASK_OFF_SKILL)
 }
@@ -227,7 +233,7 @@ public off_skill(taskid)
 	{
 		set_user_godmode(id)
 		set_user_rendering(id, kRenderFxGlowShell, 0, 0, 0, kRenderNormal, 0)
-		set_user_maxspeed(id, 270 * 1.0)
+		set_user_maxspeed(id, 275.0)
 		set_user_gravity(id, 0.8)
 	}
 }

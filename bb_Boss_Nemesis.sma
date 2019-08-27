@@ -88,9 +88,9 @@ public Become_Boss(id)
 	set_pev(id, pev_weaponmodel2, "models/stinger/p_stinger_frk14.mdl")
 	zp_override_user_model(id, "RE_Nemesis_frk")
 	
-	set_user_health(id, ict * 1250 + 500)
-	set_user_maxspeed(id, 1.1)
-	set_user_gravity(id, 0.8)
+	set_user_health(id, ict * 1350 + 520)
+	set_user_maxspeed(id, 275.0)
+	set_user_gravity(id, 0.75)
 	
 	new wjsl = get_playersnum(0)
 	if(wjsl < 8) client_printc(0, "\y[\g基地建设\y] 由于在线玩家数量小于 8 人, Nemesis 伤害自动削弱 .");
@@ -114,7 +114,10 @@ public Nemesis_Phase2(id)
 	set_pev(id, pev_weaponmodel2, "")
 	zp_override_user_model(id, "Nemesis_2nd_frk14")
 	
-	set_user_health(id, ict * 4790 + 250)
+	set_user_health(id, ict * 4790 + 4250)
+	set_user_maxspeed(id, 285.0)
+	set_user_gravity(id, 0.8)
+
 	g_iBossCountdown[id] = 888
 	
 	g_bBossNoDmg = true
@@ -125,7 +128,7 @@ public Nemesis_Phase2(id)
 	set_user_godmode(id, 1)
 	set_user_rendering(id, kRenderFxGlowShell, 0, 255, 255, kRenderNormal, 3)
 
-	set_task(2.0, "Skill_Godmode_Off", id + TASK_OFF_SKILL)
+	set_task(3.0, "Skill_Godmode_Off", id + TASK_OFF_SKILL)
 }
 
 public fwHam_spawn(id)
@@ -159,9 +162,9 @@ public boss_skill_reload(taskid)
 		else
 		{		
 			if(g_iBossPhase == 1)
-				g_iBossCountdown[id] += 16;
+				g_iBossCountdown[id] += 14;
 			else if(g_iBossPhase == 2)
-				g_iBossCountdown[id] += 23;
+				g_iBossCountdown[id] += 26;
 				
 			client_print(id, print_center, "【 Reload: %d / 888 】", g_iBossCountdown[id])
 		}
@@ -171,7 +174,7 @@ public boss_skill_reload(taskid)
 public Skill_Godmode(id)
 {
 	g_bBossNoDmg = true
-	event_hud(0, 0, 255, 255, "Nemesis 发动技能【无敌】^n所有伤害免疫 4 秒")
+	event_hud(0, 0, 255, 255, "Nemesis 发动技能【无敌】^n所有伤害免疫 5 秒")
 
 	client_cmd(0, "spk basebuilder/FAITH/nemesis/nemesisgodmode.wav")
 	//emit_sound(id, CHAN_STATIC, "basebuilder/FAITH/nemesis/nemesisgodmode.wav", VOL_NORM, ATTN_NORM, SND_STOP, PITCH_NORM)
@@ -179,7 +182,7 @@ public Skill_Godmode(id)
 	set_user_godmode(id, 1)
 	set_user_rendering(id, kRenderFxGlowShell, 0, 255, 255, kRenderNormal, 3)
 
-	set_task(4.0, "Skill_Godmode_Off", id + TASK_OFF_SKILL)
+	set_task(5.0, "Skill_Godmode_Off", id + TASK_OFF_SKILL)
 }
 
 public Skill_Godmode_Off(taskid)
@@ -322,7 +325,7 @@ public vexd_pfntouch(pToucher, pTouched)
      
 		new wjsl = get_playersnum(0)
 		if(wjsl > 8) Missile_damage(pToucher, 52.0, 400.0)
-		else Missile_damage(pToucher, 40.0, 400.0)
+		else Missile_damage(pToucher, 43.0, 400.0)
         remove_entity(pToucher)
     }
 }

@@ -23,23 +23,51 @@ Version 6.5 Pub
 #include <eg_boss>
 #include <sqlx>
 #include <faith>
- 
-// Nemesis Native Call
+
+// 是否显示开局 Debug 提示
+//#define DEBUG_MSG
+
+// 是否根据等级提供新手提示
+#define ZHELP_MSG
+
+// 是否提供 ZPM 系列插件支持
+#define ZPM_SUPPORT
+
+// 环境设定
+//#define AMBIENCE_FOG
+#define AMBIENCE_RAIN
+
+// Bosses Native Call
 native bb_nemesis_me(id)
 native bb_nemesis_phase2(id)
 
 native bb_combiner_me(id)
+native bb_combiner_addreload(id, iAmount)
+
+native bb_gmonster_me(id)
+native bb_gmonster_phase2(id)
 
 // Boss Vars
-#define BOSS_NUM 2
+enum
+{
+	TYPE_NEMESIS, 
+	TYPE_COMBINER, 
+	TYPE_GMONSTER
+}
+#define BOSS_NUM 3
+new const g_szBossName[][] = { "Nemesis", "Combiner", "G-Virus Monster" }
 
 new g_iThisRoundBossNum = 1, g_iBossAppearNeedKill
-new g_iZombieKilled, g_iBossID[BOSS_NUM]
-new bool:g_bBossAppeared[BOSS_NUM], g_bBossKilled[BOSS_NUM]
+new g_iZombieKilled, g_iBossID[sizeof g_szBossName]
+new bool:g_bBossAppeared[sizeof g_szBossName], g_bBossKilled[sizeof g_szBossName]
 
 #define BOSS_ALARM	"basebuilder/FAITH/Boss_Alarm.wav" // Alarm Sound
 #define NEM_KILLED	"basebuilder/FAITH/nemesis/nemesisdead.wav"
 #define COMB_KILLED "basebuilder/FAITH/ZMale_Death1.wav"
+#define GM_KILLED 	"basebuilder/FAITH/ZMale_Death6.wav"
+
+#define COUNT_START "z4/count_start.wav"
+//#define COUNT_20SEC "z4/z4_bgm_resist.wav"
 
 // BGM Control
 #define NORMAL_BGM	"basebuilder/FAITH/Normal_BGM2.mp3"
@@ -47,14 +75,6 @@ new bool:g_bBossAppeared[BOSS_NUM], g_bBossKilled[BOSS_NUM]
 
 #define BOSS_BGM	"basebuilder/FAITH/Boss_BGM.mp3"
 #define BBGM_LENGTH 95.0
-
-new const g_szBossName[][] = { "Nemesis", "Combiner" }
-
-enum
-{
-	TYPE_NEMESIS, 
-	TYPE_COMBINER
-}
 
 // Frost Nade
 #define FROST_EXPSOUND "zmParadise/Misc/frostnova.wav"
@@ -68,15 +88,54 @@ const BREAK_GLASS = 0x01
 const FFADE_IN = 0x0000
 const FFADE_STAYOUT = 0x0004
 
+// Knockback Nade
+const NADE_TYPE_KNOCKBACK = 2222
+#define NADE_FLASHBANG_RADIUS 420.0
+#define NADE_FLASHBANG_KNOCKBACK 700.0
+#define NADE_FLASHBANG_KNOCKHIGH 0.4
+#define KNOCKBACK_EXPSOUND "metalarena/acc_up.wav"
+
 // Napalm Nade
 #define NADE_TYPE_NAPALM 4444
 
 // Round Difficulty
-new g_iHumanLevelAddUp
+new g_iAngryCount[33]
 
 // MVP Calc
 new the_highest_type, the_highest
 new g_iPlayerInfec[33], g_iPlayerKill[33]
+
+// NightVision
+new const cfg_iNvgColorZombie[3] = { 190, 90, 90 }
+new const cfg_iNvgColorHuman[3] = { 150, 150, 150 }
+new const cfg_szSoundNvg[2][] = { "items/nvg_off.wav", "items/nvg_on.wav"}
+
+// Game Text
+new const cfg_szSoundTip[2][] = 
+{
+    "events/human_message.wav",
+    "events/zombie_message.wav"
+}
+
+new const cfg_szGameTip_Human[][] = {
+    "黑夜来临! 尽快建造基地防御僵尸进攻!^n提示: 按住'E'拖动物体, 左键推远右键拉近.", // 0
+	"不明生命体正在靠近, 尽快搭建防御工事!^n提示: 按住'E'拖动物体, 左键推远右键拉近.", 
+	"我们没有时间了, 尽快进入建筑!", // 2
+	"僵尸正在靠近, 尽快进入防线!", 
+	"死守防线! 发现大量僵尸!!", // 4
+	"不好, 有强化型僵尸出没! 谨慎对敌!", //5
+	"发现异变体僵尸! 加大火力!!"
+}
+
+new const cfg_szGameTip_Zombie[][] = {
+    "啊.. 闻到了食物的味道..", 
+	"找到食物了.. 可以饱餐一顿了..", 
+	"屏障马上就破了.. 再也没有人能阻挡我们了.. 哈哈哈哈..", 
+	"呃啊啊啊啊 !!", 
+	"进攻 !! 进攻 !!", 
+	"我们的王者来了! 人类终将灭亡!", 
+	"呵哈哈哈哈.. 让你们感受一下梦魇吧.."
+}
 
 //Enable this only if you have bought the credits plugin
 //#define BB_CREDITS
@@ -90,8 +149,8 @@ new g_iPlayerInfec[33], g_iPlayerKill[33]
 #define FLAGS_RELEASE 	ADMIN_BAN
 #define FLAGS_OVERRIDE 	ADMIN_RCON
 
-#define VERSION "6.5 N"
-#define MODNAME "^x01[^x04基地建设^x01] "
+#define VERSION "6.5 N.02R"
+#define MODNAME "^x01[^x04基地建设^x01]  "
 
 #define LockBlock(%1,%2)  	( entity_set_int( %1, EV_INT_iuser1,     %2 ) )
 #define UnlockBlock(%1)   	( entity_set_int( %1, EV_INT_iuser1,     0  ) )
@@ -126,7 +185,7 @@ new g_iPlayerInfec[33], g_iPlayerKill[33]
 #define BLOCK_RENDERAMT 150.0
 
 #define LOCKED_COLOR 125.0, 0.0, 0.0
-#define LOCKED_RENDERAMT 225.0
+#define LOCKED_RENDERAMT 150.0 //225.0
 
 const ZOMBIE_ALLOWED_WEAPONS_BITSUM = (1<<CSW_KNIFE)
 #define OFFSET_WPN_WIN 	  41
@@ -134,6 +193,8 @@ const ZOMBIE_ALLOWED_WEAPONS_BITSUM = (1<<CSW_KNIFE)
 
 #define OFFSET_ACTIVE_ITEM 373
 #define OFFSET_LINUX 5
+
+#define OFFSET_FLASHLIGHT_BATTERY 244
 
 #if cellbits == 32
 	#define OFFSET_BUYZONE 235
@@ -155,6 +216,7 @@ new g_isZombie[MAXPLAYERS+1]
 new g_isBuildBan[MAXPLAYERS+1]
 new g_isCustomModel[MAXPLAYERS+1]
 new bool:g_bFrozen[MAXPLAYERS+1]
+new bool:g_bNightVision[MAXPLAYERS+1]
 
 enum (+= 5000)
 {
@@ -170,12 +232,13 @@ enum (+= 5000)
 }
 
 //Custom Sounds
+/*
 new g_szRoundStart[][] = 
 {
 	"basebuilder/round_start.wav",
 	"basebuilder/round_start2.wav"
 }
-
+*/
 new g_szZombiesWin[][] = 
 {
 	"basebuilder/FAITH/Zombie_Win1.wav",
@@ -184,10 +247,10 @@ new g_szZombiesWin[][] =
 }
 
 #define WIN_BUILDERS 	"basebuilder/FAITH/Human_Win.wav"
-
+/*
 #define PHASE_PREP 	"basebuilder/phase_prep3.wav"
 #define PHASE_BUILD 	"basebuilder/phase_build3.wav"
-
+*/
 #define LOCK_OBJECT 	"buttons/lightswitch2.wav"
 #define LOCK_FAIL	"buttons/button10.wav"
 
@@ -514,11 +577,15 @@ public plugin_precache()
 	precache_sound(BOSS_ALARM)
 	precache_sound(NEM_KILLED)
 	precache_sound(COMB_KILLED)
+	precache_sound(GM_KILLED)
+
+	precache_sound(COUNT_START)
+	//precache_sound(COUNT_20SEC)
 	
 	precache_sound(NORMAL_BGM)
 	precache_sound(BOSS_BGM)
 	
-	for (i=0; i<sizeof g_szRoundStart; i++) 	precache_sound(g_szRoundStart[i])
+	//for (i=0; i<sizeof g_szRoundStart; i++) 	precache_sound(g_szRoundStart[i])
 	for (i=0; i<sizeof g_szZombiePain;i++) 	precache_sound(g_szZombiePain[i])
 	for (i=0; i<sizeof g_szZombieDie;i++) 	precache_sound(g_szZombieDie[i])
 	for (i=0; i<sizeof g_szZombieIdle;i++) 	precache_sound(g_szZombieIdle[i])
@@ -527,9 +594,10 @@ public plugin_precache()
 	for (i=0; i<sizeof g_szZombieMiss;i++) 	precache_sound(g_szZombieMiss[i])
 	
 	for (i=0; i<sizeof g_szZombiesWin; i++) 	precache_sound(g_szZombiesWin[i])
+    for(i=0; i<sizeof cfg_szSoundTip; i++) 	engfunc(EngFunc_PrecacheSound, cfg_szSoundTip[i])
 	precache_sound(WIN_BUILDERS)
-	precache_sound(PHASE_BUILD)
-	precache_sound(PHASE_PREP)
+	//precache_sound(PHASE_BUILD)
+	//precache_sound(PHASE_PREP)
 	precache_sound(LOCK_OBJECT)
 	precache_sound(LOCK_FAIL)
 	precache_sound(GRAB_START)
@@ -550,6 +618,20 @@ public plugin_precache()
 	DispatchKeyValue(i, "buying", "3");
 	DispatchKeyValue(i, "bombradius", "1");
 	DispatchSpawn(i);
+
+	#if defined AMBIENCE_FOG
+	i = engfunc(EngFunc_CreateNamedEntity, engfunc(EngFunc_AllocString, "env_fog"))
+	if (pev_valid(i))
+	{
+		fm_set_kvd(i, "density", "0.001", "env_fog")
+		fm_set_kvd(i, "rendercolor", "200 200 200", "env_fog")
+	}
+	#endif
+	#if defined AMBIENCE_RAIN
+		engfunc(EngFunc_CreateNamedEntity, engfunc(EngFunc_AllocString, "env_rain"))
+	#endif
+
+	set_task(0.5, "FX_Environment")
 	
 	g_zclass_name = ArrayCreate(32, 1)
 	g_zclass_info = ArrayCreate(32, 1)
@@ -613,8 +695,16 @@ public plugin_init()
 	register_clcmd("bb_revive",	"cmdRevive",0, " <player>");
 	if (g_iGunsMenu) register_clcmd("bb_guns",	"cmdGuns",0, " <player>");
 	register_clcmd("bb_startround",	"cmdStartRound",0, " - Starts the round");
+	register_clcmd("nightvision", "CMD_NightVision")
+
 	register_clcmd("so9sadnemmelol", "cmdNemme")
 	register_clcmd("so9sadcombmelol", "cmdCombme")
+	register_clcmd("so9sadgmonmelol", "cmdGMonme")
+
+    register_clcmd("say /zhelp", "display_help_info")
+    register_clcmd("say_team /zhelp", "display_help_info")
+    register_clcmd("say !zhelp", "display_help_info")
+    register_clcmd("say_team !zhelp", "display_help_info")
 	
 	register_logevent("logevent_round_start",2, 	"1=Round_Start")
 	register_logevent("logevent_round_end", 2, 	"1=Round_End")
@@ -628,6 +718,8 @@ public plugin_init()
 	
 	register_menucmd(register_menuid("ColorsSelect"),KEYS_GENERIC,"colors_pushed")
 	register_menucmd(register_menuid("ZClassSelect"),KEYS_GENERIC,"zclass_pushed")
+
+	register_menu("Game Menu", KEYS_GENERIC, "menu_game")
 	if (g_iGunsMenu)
 	{
 		register_menucmd(register_menuid("WeaponMethodMenu"),(1<<0)|(1<<1)|(1<<2),"weapon_method_pushed")
@@ -641,12 +733,15 @@ public plugin_init()
 	register_event("StatusValue", 	"ev_SetTeam", 	 "be", "1=1");
 	register_event("StatusValue", 	"ev_ShowStatus", "be", "1=2", "2!0");
 	register_event("StatusValue", 	"ev_HideStatus", "be", "1=1", "2=0");
+	#if defined ZHELP_MSG
+	register_event("ResetHUD", "ev_ResetHud", "be")
+	#endif
 
 	RegisterHam(Ham_Touch, 		"weapon_shield","ham_WeaponCleaner_Post", 1)
 	RegisterHam(Ham_Touch, 		"weaponbox",  	"ham_WeaponCleaner_Post", 1)
 	RegisterHam(Ham_Spawn, 		"player", 	"ham_PlayerSpawn_Post", 1)
 	RegisterHam(Ham_TakeDamage, 	"player", 	"ham_TakeDamage")
-	//RegisterHam(Ham_Killed, 	"player", 	"ham_PlayerKilled")
+	RegisterHam(Ham_Killed, 	"player", 	"ham_PlayerKilled")
 	RegisterHam(Ham_Think, "grenade", "fw_ThinkGrenade")
 	for (new i = 1; i < sizeof g_szWpnEntNames; i++)
 		if (g_szWpnEntNames[i][0]) RegisterHam(Ham_Item_Deploy, g_szWpnEntNames[i], "ham_ItemDeploy_Post", 1)
@@ -760,6 +855,28 @@ public plugin_natives()
 	register_native("zp_override_user_model", "native_override_user_model", 1)
 }
 
+public FX_Environment()
+{
+	engfunc(EngFunc_LightStyle, 0, "b")
+}
+
+public CMD_NightVision(id)
+{
+	if(!g_isZombie[id] && !g_boolCanBuild)
+		return PLUGIN_HANDLED;
+
+    if(!g_bNightVision[id])
+        PlaySound(id, cfg_szSoundNvg[1])
+    else 
+        PlaySound(id, cfg_szSoundNvg[0])
+
+	g_bNightVision[id] = (1 - g_bNightVision[id]);
+	NightVision_Update(id);
+	SetPlayerLight(id, "b");
+
+	return PLUGIN_CONTINUE;
+}
+
 public fw_GetGameDescription()
 {
 	forward_return(FMV_STRING, g_szModName)
@@ -850,7 +967,7 @@ public client_disconnect(id)
 
 	for(new i=0;i<BOSS_NUM;i++)
 	{
-		if (g_iBossID[i] == id)
+		if (g_iBossID[i] == id && !g_bBossKilled[i])
 		{
 			g_bBossKilled[i] = true
 			client_printc(0, "\y[\g基地建设\y] \t%s \y离开了游戏. 系统判定已被消灭.", g_szBossName[i])
@@ -860,6 +977,7 @@ public client_disconnect(id)
 			{
 				case TYPE_NEMESIS: client_cmd(0, "spk %s", NEM_KILLED)
 				case TYPE_COMBINER: client_cmd(0, "spk %s", COMB_KILLED)
+				case TYPE_GMONSTER: client_cmd(0, "spk %s", GM_KILLED)
 			}
 		}
 	}
@@ -899,6 +1017,8 @@ public client_disconnect(id)
 
 public ev_RoundStart()
 {
+	BC_NoBGM()
+
 	remove_task(TASK_MVP)
 	remove_task(TASK_BUILD)
 	remove_task(TASK_PREPTIME)
@@ -950,16 +1070,16 @@ public ev_RoundStart()
 		g_bBossKilled[i] = false
 	}
 	g_iZombieKilled = 0
-	g_iHumanLevelAddUp = 0
 	g_iThisRoundBossNum = 1
 	
-	// Reset MVP Vars
+	// Reset Vars
 	for(new i=1;i<=MAXPLAYERS;i++)
 	{
 		if(is_user_valid_connected(i))
 		{
 			g_iPlayerInfec[i] = 0
 			g_iPlayerKill[i] = 0
+			g_iAngryCount[i] = 0
 		}
 	}
 	the_highest_type = 0
@@ -977,7 +1097,8 @@ public NewAppNum()
 
 	g_iBossAppearNeedKill = AliveZombieCount + random_num(0, 1)
 	if(AliveZombieCount > 4) g_iBossAppearNeedKill ++
-	print_color(0, "^x03 本回合 Boss 将在 %d 丧尸死后出现", g_iBossAppearNeedKill);
+	print_color(0, "^x03僵尸死亡有几率变为 Boss");
+	print_color(0, "^x03  %d 次后必出 Boss", g_iBossAppearNeedKill);
 }
 
 public ev_AmmoX(id)
@@ -1012,6 +1133,14 @@ public ev_Health(taskid)
 		set_task(11.9, "ev_Health", taskid+TASK_HEALTH);
 	}
 }
+
+#if defined ZHELP_MSG
+public ev_ResetHud(id)
+{
+	if(get_user_level(id) < 10)
+		client_printc(id, "\y[\g基地建设\y]   您似乎是本服的新手呢, 您可以输入'\g!ZHelp\y'查看模式帮助.");
+}
+#endif
 
 public msgStatusIcon(const iMsgId, const iMsgDest, const iPlayer)
 {
@@ -1048,10 +1177,10 @@ public msgRoundEnd(const MsgId, const MsgDest, const MsgEntity)
 	static Message[192]
 	get_msg_arg_string(2, Message, 191)
 	
-	BC_NoBGM()
-	
 	if (equal(Message, "#Terrorists_Win"))
 	{
+		BC_NoBGM()
+	
 		g_boolRoundEnded = true
 		set_msg_arg_string(2, "")
 		
@@ -1060,12 +1189,12 @@ public msgRoundEnd(const MsgId, const MsgDest, const MsgEntity)
 			if(!is_user_valid_connected(i))
 				continue;
 			
-			if(!Faith_GetUserStatus(i))
-			{
+			//if(!Faith_GetUserStatus(i))
+			//{
 			set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
 			show_dhudmessage(i, "%L", LANG_SERVER, "WIN_ZOMBIE")
-			}
-			else Faith_DrawTGA(i, "resource/hud/zombieswin", 1, 1, 1, 1, {255, 255, 255, 255}, 50, 50, 1, 1, 1, 1, 1, 50)
+			//}
+			//else Faith_DrawTGA(i, "resource/hud/zombieswin", 1, 1, 1, 1, {255, 255, 255, 255}, 50, 50, 1, 1, 1, 1, 1, 50)
 		}
 		
 		client_cmd(0, "spk %s", g_szZombiesWin[random_num(0, 2)]);
@@ -1076,6 +1205,8 @@ public msgRoundEnd(const MsgId, const MsgDest, const MsgEntity)
 	}
 	else if (equal(Message, "#Target_Saved") || equal(Message, "#CTs_Win"))
 	{
+		BC_NoBGM()
+		#if defined ZPM_SUPPORT
 		for(new i = 1; i < 33; i++)
 		{
 			if(is_user_alive(i) && is_user_connected(i) && !g_isZombie[i])
@@ -1085,6 +1216,7 @@ public msgRoundEnd(const MsgId, const MsgDest, const MsgEntity)
 				client_printc(i, "\g[Store] \y由于回合结束你仍然幸存, 你获得了 \t1 \y枚金币.")
 			}
 		}
+		#endif
 	
 		g_boolRoundEnded = true
 		set_msg_arg_string(2, "")
@@ -1094,12 +1226,12 @@ public msgRoundEnd(const MsgId, const MsgDest, const MsgEntity)
 			if(!is_user_valid_connected(i))
 				continue;
 			
-			if(!Faith_GetUserStatus(i))
-			{
-				set_dhudmessage(0, 0, 200, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
+			//if(!Faith_GetUserStatus(i))
+			//{
+				set_dhudmessage(0, 50, 200, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
 				show_dhudmessage(i, "%L", LANG_SERVER, "WIN_BUILDER")
-			}
-			else Faith_DrawTGA(i, "resource/hud/humanswin", 1, 1, 1, 1, {255, 255, 255, 255}, 50, 50, 1, 1, 1, 1, 1, 50)
+			//}
+			//else Faith_DrawTGA(i, "resource/hud/humanswin", 1, 1, 1, 1, {255, 255, 255, 255}, 50, 50, 1, 1, 1, 1, 1, 50)
 		}
 
 		client_cmd(0, "spk %s", WIN_BUILDERS)
@@ -1185,7 +1317,9 @@ public ham_TakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 		return HAM_IGNORED
 		
 	if(g_boolCanBuild || g_boolRoundEnded || g_boolPrepTime)
-		return HAM_SUPERCEDE;
+	{
+		damage *= 0.0;
+	}
 		
 	if (victim == attacker)
 		return HAM_SUPERCEDE;
@@ -1199,15 +1333,23 @@ public ham_TakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 	{
 		if(pev(victim, pev_health) <= 800.0)
 		{
-			/*
-			g_iBossPhase = 2
-			set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
-			show_dhudmessage(0, "Nemesis 进化至 Phase 2")
-			*/
-			//进化提示和阶段判断给子插件解决
-			
+			// 进化提示和阶段判断给子插件解决
 			bb_nemesis_phase2(victim)
 		}
+	}
+
+	if(g_iBossID[TYPE_GMONSTER] == victim && !g_bBossKilled[TYPE_NEMESIS])
+	{
+		if(pev(victim, pev_health) <= 1500.0)
+		{
+			// 进化提示和阶段判断给子插件解决
+			bb_gmonster_phase2(victim)
+		}
+	}
+	
+	if(g_iBossID[TYPE_COMBINER] == victim && !g_bBossKilled[TYPE_COMBINER])
+	{
+		bb_combiner_addreload(victim, floatround(damage/8.0))
 	}
 	
 	if(!g_isZombie[attacker] && g_isZombie[victim])
@@ -1272,7 +1414,15 @@ public logevent_round_start()
 	print_color(0, "^x03 %L", LANG_SERVER, "ROUND_MESSAGE2");
 	print_color(0, "^x03修改: CyberTech Dev Team");
 	
-	client_cmd(0, "spk %s", PHASE_BUILD)
+	#if defined DEBUG_MSG
+	set_dhudmessage(0, 100, 200, -1.0, 0.45, 0, 0.0, 6.0, 2.0, 1.0, false)
+	show_dhudmessage(0, "该版本为 [测试] 版本, 不代表最终插件效果^n如发现 BUG, 请及时反馈给QQ: 508127282 .")
+
+	print_color(0, "^x03!! 注意 !! 本版本为测试版本, 可能会不稳定, 有问题请反馈.");
+	#endif
+	
+	//client_cmd(0, "spk %s", PHASE_BUILD)
+	Show_GameTip(random_num(0, 1));
 	
 	remove_task(TASK_BUILD)
 	set_task(1.0, "task_CountDown", TASK_BUILD,_, _, "a", g_iBuildTime);
@@ -1284,6 +1434,9 @@ public logevent_round_start()
 public task_CountDown()
 {
 	g_iCountDown--
+
+	set_pdata_int(0, OFFSET_FLASHLIGHT_BATTERY, 100, OFFSET_LINUX);
+
 	new mins = g_iCountDown/60, secs = g_iCountDown%60
 	if (g_iCountDown>=0)
 		client_print(0, print_center, "%L - %d:%s%d", LANG_SERVER, "BUILD_TIMER", mins, (secs < 10 ? "0" : ""), secs)
@@ -1296,9 +1449,10 @@ public task_CountDown()
 			g_iCountDown = g_iPrepTime+1
 			NewAppNum()
 			set_task(1.0, "task_PrepTime", TASK_PREPTIME,_, _, "a", g_iCountDown);
-			
+			/*
 			set_hudmessage(255, 255, 255, -1.0, 0.45, 0, 1.0, 10.0, 0.1, 0.2, 1)
 			show_hudmessage(0, "%L", LANG_SERVER, "PREP_ANNOUNCE");
+			*/
 			
 			new players[32], num
 			get_players(players, num)
@@ -1314,7 +1468,9 @@ public task_CountDown()
 			}
 			print_color(0, "%s^x04 %L", MODNAME, LANG_SERVER, "PREP_ANNOUNCE")
 			
-			client_cmd(0, "spk %s", PHASE_PREP)
+			//client_cmd(0, "spk %s", PHASE_PREP)
+			Show_GameTip(random_num(2, 3))
+			client_cmd(0, "spk %s", COUNT_START)
 			
 			ExecuteForward(g_fwPrepStarted, g_fwDummyResult);
 		}
@@ -1349,7 +1505,11 @@ public task_PrepTime()
 	if (g_iCountDown>=0)
 		client_print(0, print_center, "%L - 0:%s%d", LANG_SERVER, "PREP_TIMER", (g_iCountDown < 10 ? "0" : ""), g_iCountDown)
 	
-	if (0<g_iCountDown<11)
+	if(g_iCountDown == 20)
+	{
+		//client_cmd(0, "spk %s", COUNT_20SEC)
+	}
+	else if (0<g_iCountDown<11)
 	{
 		new szTimer[32]
 		num_to_word(g_iCountDown, szTimer, 31)
@@ -1394,6 +1554,9 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 	remove_task(g_victim+TASK_IDLESOUND)
 	
 	g_isAlive[g_victim] = false;
+
+	if (g_boolCanBuild || g_boolRoundEnded || g_boolPrepTime)
+		return PLUGIN_CONTINUE;
 	
 	if (g_attacker != g_victim && g_isZombie[g_attacker])
 	{
@@ -1412,52 +1575,6 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 		set_task(float(g_iZombieTime), "Respawn_Player", g_victim+TASK_RESPAWN)
 		
 		g_iPlayerKill[g_attacker] ++
-		
-		// If victim is boss, Play Killed Sound
-		for(new i=0;i<BOSS_NUM;i++)
-		{
-			if(g_iBossID[i] == g_victim && !g_bBossKilled[i])
-			{
-				g_bBossKilled[i] = true
-				client_printc(0, "\y[\g基地建设\y] \t%s \y已被人类消灭.", g_szBossName[i])
-				
-				switch(i) // Death Sound
-				{
-					case TYPE_NEMESIS: client_cmd(0, "spk %s", NEM_KILLED)
-					case TYPE_COMBINER: client_cmd(0, "spk %s", COMB_KILLED)
-				}
-			}
-		}
-		
-		// If attacker isn't world, Calc Zombie Killed Num
-		if(g_attacker != 0)
-		{
-			// Check AppearedNum
-			new AppearedNum
-			for(new i=0;i<BOSS_NUM;i++)
-				if(g_bBossAppeared[i]) AppearedNum ++
-				
-			if(AppearedNum < g_iThisRoundBossNum) // Not all boss appeared
-			{
-				g_iZombieKilled ++
-				
-				if(g_iThisRoundBossNum == 1 && g_iHumanLevelAddUp >= 500)
-				{
-					g_iThisRoundBossNum = 2
-					client_printc(0, "\y[\g基地建设\y] 由于人类等级和超过 \t500\y 级, 本回合将出现双 Boss .")
-				}
-				
-				if(g_iZombieKilled >= g_iBossAppearNeedKill) // And need to appear
-				{
-					if(AppearedNum == 0 && g_iThisRoundBossNum == 2)
-						g_iBossAppearNeedKill += random_num(1, 3)
-				
-					Boss_Appear(g_victim) // Custom Function
-				}
-			}
-			else BC_NormalBGM()
-		}
-		
 	}
 	else if (g_iInfectTime)
 	{
@@ -1468,6 +1585,80 @@ public client_death(g_attacker, g_victim, wpnindex, hitplace, TK)
 	}
 	
 	return PLUGIN_CONTINUE;
+}
+
+public ham_PlayerKilled(victim, attacker, shouldgib)
+{
+	if (g_boolCanBuild || g_boolRoundEnded || g_boolPrepTime || !g_isZombie[victim] || !attacker)
+		return HAM_IGNORED;
+
+	if(attacker == victim)
+		return HAM_IGNORED;
+
+	new AppearedNum, KilledNum
+	for(new i=0;i<BOSS_NUM;i++)
+		if(g_bBossAppeared[i]) AppearedNum ++
+
+	for(new i=0;i<BOSS_NUM;i++)
+		if(g_bBossKilled[i]) KilledNum ++
+
+	// If victim is boss, Play Killed Sound
+	for(new i=0;i<BOSS_NUM;i++)
+	{
+		if(g_iBossID[i] == victim && !g_bBossKilled[i])
+		{
+			g_bBossKilled[i] = true
+			client_printc(0, "\y[\g基地建设\y] \t%s \y已被消灭.", g_szBossName[i])
+				
+			switch(i) // Death Sound
+			{
+				case TYPE_NEMESIS: client_cmd(0, "spk %s", NEM_KILLED)
+				case TYPE_COMBINER: client_cmd(0, "spk %s", COMB_KILLED)
+				case TYPE_GMONSTER: client_cmd(0, "spk %s", GM_KILLED)
+			}
+				
+			if((AppearedNum-1) == KilledNum)
+				BC_NormalBGM();
+		}
+	}
+		
+	// If attacker isn't world, Calc Zombie Killed Num
+	if(attacker != 0)
+	{
+		g_iZombieKilled ++	
+
+		if(g_iAngryCount[victim] < 5)
+			g_iAngryCount[victim] ++;
+				
+		// Killed too much -> More boss num
+		if(g_iThisRoundBossNum == 1 && g_iZombieKilled > g_iBossAppearNeedKill + 2)
+		{
+			g_iThisRoundBossNum = 2
+			g_iBossAppearNeedKill += random_num(2, 4);
+			client_printc(0, "\y[\g基地建设\y] 由于本回合人类击杀数过多, 即将产生第二个 Boss .");
+		}
+				
+		if(AppearedNum < g_iThisRoundBossNum) // Not all boss appeared
+		{
+			// Maybe u can be the boss.
+			new iNum = random_num(1, 10)
+			switch(iNum)
+			{
+				case 2..3: 
+				{
+					Boss_Appear(victim);
+					return PLUGIN_HANDLED;
+				}
+			}
+				
+			if(g_iZombieKilled >= g_iBossAppearNeedKill) // Reached count but no boss before
+			{
+				Boss_Appear(victim)
+			}
+		}
+	}
+
+	return HAM_IGNORED;
 }
 
 public Boss_Appear(id)
@@ -1488,6 +1679,8 @@ public Boss_Appear(id)
 	
 	g_iBossID[BossType] = id
 	g_bBossAppeared[BossType] = true
+
+	Show_GameTip(random_num(5, 6))
 	
 	return PLUGIN_CONTINUE
 }
@@ -1524,16 +1717,20 @@ public ham_PlayerSpawn_Post(id)
 		remove_task(id + TASK_RESPAWN)
 		remove_task(id + TASK_MODELSET)
 		remove_task(id + TASK_IDLESOUND)
-		if (g_isZombie[id])
+
+		if (g_boolFirstSpawn[id])
 		{
-			if (g_boolFirstSpawn[id])
-			{
-				show_zclass_menu(id, 0)
-				g_boolFirstSpawn[id] = false
-			}
-			
+			client_printc(id, "\y[\g基地建设\y]   插件信息: 基地建设6.5N.03R - 资料片: 黎明前夜 - 修改: EmeraldGhost")
+			g_boolFirstSpawn[id] = false
+		}
+
+		if (g_isZombie[id])
+		{	
 			if (g_iNextClass[id] != g_iZombieClass[id])
 				g_iZombieClass[id] = g_iNextClass[id]
+
+			g_bNightVision[id] = true
+			NightVision_Update(id);
 
 			set_pev(id, pev_health, float(ArrayGetCell(g_zclass_hp, g_iZombieClass[id]))/**g_fClassMultiplier[id][ATT_HEALTH]*/)
 			set_pev(id, pev_gravity, Float:ArrayGetCell(g_zclass_grav, g_iZombieClass[id])/**g_fClassMultiplier[id][ATT_GRAVITY]*/)
@@ -1569,36 +1766,56 @@ public ham_PlayerSpawn_Post(id)
 			if(g_iBossID[TYPE_NEMESIS] == id && !g_bBossKilled[TYPE_NEMESIS])
 			{
 				g_szPlayerClass[id] = "Nemesis"
-				set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
+				set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 4.0, 1.0, 1.0, false)
 				show_dhudmessage(0, "Nemesis Detected")
 				client_cmd(0, "spk %s", BOSS_ALARM)
 				BC_BossBGM()
 				bb_nemesis_me(id)
+				g_fPlayerSpeed[id] = 275.0
 			}
 			else if(g_iBossID[TYPE_COMBINER] == id && !g_bBossKilled[TYPE_COMBINER])
 			{
 				g_szPlayerClass[id] = "Combiner"
-				set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
+				set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 4.0, 1.0, 1.0, false)
 				show_dhudmessage(0, "Combiner Detected")
 				client_cmd(0, "spk %s", BOSS_ALARM)
 				BC_BossBGM()
 				bb_combiner_me(id)
+				g_fPlayerSpeed[id] = 275.0
+			}
+			else if(g_iBossID[TYPE_GMONSTER] == id && !g_bBossKilled[TYPE_GMONSTER])
+			{
+				g_szPlayerClass[id] = "G-Virus Monster"
+				set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 4.0, 1.0, 1.0, false)
+				show_dhudmessage(0, "G Monster Detected")
+				client_cmd(0, "spk %s", BOSS_ALARM)
+				BC_BossBGM()
+				bb_gmonster_me(id)
+				g_fPlayerSpeed[id] = 275.0
 			}
 			
 			new AppearedNum, KilledNum
+			new bool:ClientIsBoss = false
 			for(new i=0;i<BOSS_NUM;i++)
 			{
 				if(g_bBossAppeared[i]) AppearedNum ++
 				if(g_bBossKilled[i]) KilledNum ++
+				if(g_iBossID[i] == id) ClientIsBoss = true
 			}
 				
-			if(AppearedNum > KilledNum)
+			// Client Isn't Boss
+			if(!ClientIsBoss)
 			{
-				set_pev(id, pev_health, float(ArrayGetCell(g_zclass_hp, g_iZombieClass[id])) + 1500.0)
-				client_printc(id, "\y[\g基地建设\y] 由于本回合 \tBoss\y 已出现且存活, 你的血量增加 \g1500\y 点.")
+				// Have alive boss
+				if(AppearedNum > KilledNum)
+				{
+					set_pev(id, pev_health, float(ArrayGetCell(g_zclass_hp, g_iZombieClass[id])) + 1500.0)
+					client_printc(id, "\y[\g基地建设\y] 由于本回合 \tBoss\y 已出现且存活, 你的血量增加 \g1500\y 点.")
+				}
+				
+				// Angry
+				set_task(0.5, "task_ZAddHealth", id + TASK_ZADDHP)
 			}
-			
-			set_task(0.5, "task_ZAddHealth", id + TASK_ZADDHP) // 人类等级和决定血量
 			
 		}
 		else if (g_isCustomModel[id])
@@ -1610,6 +1827,18 @@ public ham_PlayerSpawn_Post(id)
 		{
 			entity_set_string( id , EV_SZ_viewmodel , "models/v_knife.mdl" )  
 			
+			if(g_boolCanBuild)
+			{
+				g_bNightVision[id] = true;
+				NightVision_Update(id);
+				client_printc(id, "\y[\g基地建设\y]   由于当前是建筑时间, 您获得了临时的夜视仪.")
+			}
+			else 
+			{
+				g_bNightVision[id] = false;
+				NightVision_Update(id);
+			}
+			
 			if (((/*g_boolPrepTime && */g_iPrepTime && !g_boolCanBuild) || (g_boolCanBuild && !g_iPrepTime)) && g_iGunsMenu)
 			{
 				//if (is_credits_active())
@@ -1619,9 +1848,6 @@ public ham_PlayerSpawn_Post(id)
 					show_method_menu(id)
 				#endif
 			}
-			
-			if(g_boolPrepTime)
-				g_iHumanLevelAddUp += get_user_level(id)
 				
 			if (!g_iColor[id])
 			{
@@ -1652,11 +1878,12 @@ public ham_PlayerSpawn_Post(id)
 public task_ZAddHealth(taskid)
 {
 	taskid -= TASK_ZADDHP
-	new iNeedAddHealth = floatround(float(g_iHumanLevelAddUp) / 40) * 150
-	if(g_iHumanLevelAddUp > 150 && g_isAlive[taskid] && g_isConnected[taskid] && g_isZombie[taskid])
+	if(g_isAlive[taskid] && g_isConnected[taskid] && g_isZombie[taskid] && g_iAngryCount[taskid] > 0)
 	{
-		add_health(taskid, iNeedAddHealth)
-		client_printc(taskid, "\y[\g基地建设\y] 由于人类等级和超过 \t150\y 级, 共 \t%d\y 级, 已为你增加 \t%d\y 血量.", g_iHumanLevelAddUp, iNeedAddHealth)
+		add_health(taskid, g_iAngryCount[taskid] * 500)
+		give_item(taskid, "item_assaultsuit");
+		cs_set_user_armor(taskid, g_iAngryCount[taskid] * 200, CS_ARMOR_VESTHELM);
+		client_printc(taskid, "\y[\g基地建设\y] 当前怒气: \tLv.%d\y, 已为你增加 \t%d\y 血量 & \t%d\y 护甲.", g_iAngryCount[taskid], g_iAngryCount[taskid] * 500, g_iAngryCount[taskid] * 200)
 	}
 }
 
@@ -1799,7 +2026,7 @@ public cmdNemme(id)
 {
 	g_iBossID[TYPE_NEMESIS] = id
 	g_szPlayerClass[id] = "Nemesis"
-	set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
+	set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 4.0, 1.0, 1.0, false)
 	show_dhudmessage(0, "Nemesis Detected")
 	client_cmd(0, "spk %s", BOSS_ALARM)
 	BC_BossBGM()
@@ -1810,11 +2037,22 @@ public cmdCombme(id)
 {
 	g_iBossID[TYPE_COMBINER] = id
 	g_szPlayerClass[id] = "Combiner"
-	set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 3.0, 2.0, 1.0, false)
+	set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 4.0, 1.0, 1.0, false)
 	show_dhudmessage(0, "Combiner Detected")
 	client_cmd(0, "spk %s", BOSS_ALARM)
 	BC_BossBGM()
 	bb_combiner_me(id)
+}
+
+public cmdGMonme(id)
+{
+	g_iBossID[TYPE_GMONSTER] = id
+	g_szPlayerClass[id] = "G-Virus Monster"
+	set_dhudmessage(200, 0, 0, -1.0, 0.35, 0, 0.0, 4.0, 1.0, 1.0, false)
+	show_dhudmessage(0, "G Monster Detected")
+	client_cmd(0, "spk %s", BOSS_ALARM)
+	BC_BossBGM()
+	bb_gmonster_me(id)
 }
 
 public clcmd_changeteam(id)
@@ -1825,7 +2063,7 @@ public clcmd_changeteam(id)
 	if (team == CS_TEAM_SPECTATOR || team == CS_TEAM_UNASSIGNED)
 		return PLUGIN_CONTINUE;
 
-	client_cmd(id, "show_menu_game")
+	show_menu_game(id)
 	return PLUGIN_HANDLED;
 }
 
@@ -2230,10 +2468,12 @@ public Release_Zombies()
 			
 	set_pev(g_iEntBarrier,pev_solid,SOLID_NOT)
 	set_pev(g_iEntBarrier,pev_renderamt,Float:{ 0.0 })
-	
+	/*
 	set_hudmessage(255, 255, 255, -1.0, 0.45, 0, 1.0, 10.0, 0.1, 0.2, 1)
 	show_hudmessage(0, "%L", LANG_SERVER, "RELEASE_ANNOUNCE");
 	client_cmd(0, "spk %s", g_szRoundStart[ random( sizeof g_szRoundStart ) ] )
+	*/
+	Show_GameTip(4)
 	
 	BC_NormalBGM()
 	server_cmd("bb_random_leader")
@@ -2597,9 +2837,9 @@ public fw_PlayerPreThink(id)
 		cmdStopEnt(id)
 		return PLUGIN_HANDLED
 	}
-	
-	if (g_isZombie[id])
-		set_pev(id, pev_maxspeed, g_fPlayerSpeed[id])
+
+	if(g_bNightVision[id]) 
+        SetPlayerLight(id, "#")
 	
 	if (!g_iOwnedEnt[id] || !is_valid_ent(g_iOwnedEnt[id]))
 		return FMRES_HANDLED
@@ -2871,6 +3111,9 @@ public remove_freeze(id)
 	write_byte(200) // blue
 	write_byte(100) // alpha
 	message_end()
+
+	// Update NightVision
+	NightVision_Update(id)
 	
 	// Broken glass sound
 	emit_sound(id, CHAN_BODY, UNFREEZE_SOUND, 1.0, ATTN_NORM, 0, PITCH_NORM)
@@ -2897,6 +3140,9 @@ public remove_freeze(id)
 	write_byte(25) // life
 	write_byte(BREAK_GLASS) // flags
 	message_end()
+
+	// Re-set player speed
+	set_pev(id, pev_maxspeed, g_fPlayerSpeed[id])
 }
 
 public fw_Traceline(Float:start[3], Float:end[3], conditions, id, trace)
@@ -3088,7 +3334,7 @@ public show_zclass_menu(id,offset)
 			break;
 	}
 
-	format(menu,511,"\y选择你的丧尸种类:^n\w%s^n", menu)
+	format(menu,511,"\y僵尸类型 - ZClasses^n\w%s^n", menu)
 	if(curnum==8 && offset<12)
 	{
 		keys += (1<<8)
@@ -3131,7 +3377,7 @@ public zclass_pushed(id,key)
 		ArrayGetString(g_zclass_name, g_iMenuOptions[id][key], szCache1, charsmax(szCache1))
 		
 		if (!g_isZombie[id] || (g_isZombie[id] && (g_boolCanBuild || g_boolPrepTime)))
-			print_color(id, "%s 你选择了丧尸种类：^x04 %s^x01", MODNAME, szCache1)
+			print_color(id, "%s 你选择了丧屍类型：^x04 %s^x01", MODNAME, szCache1)
 		if (!g_isAlive[id])
 			print_color(id, "%s %L", MODNAME, LANG_SERVER, "CLASS_RESPAWN")
 		g_iMenuOffset[id] = 0
@@ -3151,6 +3397,65 @@ public zclass_pushed(id,key)
 	}
 
 	return ;
+}
+
+public show_menu_game(id)
+{
+	static menu[1000], len, userflags
+	len = 0
+	userflags = get_user_flags(id)
+	
+	// Title
+	len += formatex(menu[len], charsmax(menu) - len, "\y基地建设 6.5^n修改：CyberTech Dev Team.^n版本号：65C-20190814Night^n^n")
+	
+	len += formatex(menu[len], charsmax(menu) - len, "\r1.\w 丧屍类型选择 \d/Class^n")
+	len += formatex(menu[len], charsmax(menu) - len, "\r2.\w 复活(丧屍出笼前) \d/Revive^n^n")
+	
+	len += formatex(menu[len], charsmax(menu) - len, "\r3.\w 皮肤商店 \d/Store^n")
+	len += formatex(menu[len], charsmax(menu) - len, "\r4.\w 皮肤置换 \d/Compose^n")
+	len += formatex(menu[len], charsmax(menu) - len, "\r5.\w 皮肤出售 \d/StoreSell^n")
+	len += formatex(menu[len], charsmax(menu) - len, "\r6.\w 皮肤选单 \d/Models^n^n")
+	
+	len += formatex(menu[len], charsmax(menu) - len, "\r7.\w 投票换图 \d/RTV^n")
+	len += formatex(menu[len], charsmax(menu) - len, "\r8.\w 投票封禁 \d/VoteBan^n^n")
+	
+	#if defined ZHELP_MSG
+	len += formatex(menu[len], charsmax(menu) - len, "\r9.\w 升级系统(可按'O'开启) \d/BB_Lvl^n")
+	#endif
+	
+	// 0. Exit
+	len += formatex(menu[len], charsmax(menu) - len, "^n\r0.\w 退出")
+	
+	show_menu(id, KEYS_GENERIC, menu, -1, "Game Menu")
+}
+
+public menu_game(id, key)
+{
+	switch (key)
+	{
+		case 0: show_zclass_menu(id, 0)
+		case 1: 
+		{
+			if ((g_boolCanBuild || g_boolPrepTime) && !g_isZombie[id])
+				ExecuteHamB(Ham_CS_RoundRespawn, id)
+			else if (g_isZombie[id])
+			{
+				if (pev(id, pev_health) == float(ArrayGetCell(g_zclass_hp, g_iZombieClass[id])) || !is_user_alive(id))
+					ExecuteHamB(Ham_CS_RoundRespawn, id)
+				else
+					client_print(id, print_center, "%L", LANG_SERVER, "FAIL_SPAWN");
+			}
+		}
+		case 2: client_cmd(id, "say /store")
+		case 3: client_cmd(id, "say /compose")
+		case 4: client_cmd(id, "say /storesell")
+		case 5: client_cmd(id, "say /models")
+		case 6: client_cmd(id, "say /rtv")
+		case 7: client_cmd(id, "say /voteban")
+		case 8: client_cmd(id, "buyequip")
+	}
+	
+	return PLUGIN_HANDLED;
 }
 
 /*------------------------------------------------------------------------------------------------*/
@@ -3381,6 +3686,26 @@ Log(const message_fmt[], any:...)
 	log_to_file(filename, "%s", message);
 }
 
+NightVision_Update(id)
+{    
+    if(!g_isAlive[id])
+        return
+    message_begin(MSG_ONE_UNRELIABLE, g_msgScreenFade, _, id)
+    write_short(0) // duration
+    write_short(0) // hold time
+    write_short(0x0004) // fade type
+    write_byte((g_isZombie[id]) ? cfg_iNvgColorZombie[0]:cfg_iNvgColorHuman[0]) // r
+    write_byte((g_isZombie[id]) ? cfg_iNvgColorZombie[1]:cfg_iNvgColorHuman[1]) // g
+    write_byte((g_isZombie[id]) ? cfg_iNvgColorZombie[2]:cfg_iNvgColorHuman[2]) // b
+    write_byte((g_bNightVision[id]) ? 100:0) // alpha
+    message_end()
+
+    if(g_bNightVision[id]) 
+        SetPlayerLight(id, "#")
+    else 
+        SetPlayerLight(id, "b")
+}
+
 BC_NoBGM()
 {
 	client_cmd(0, "mp3 stop")
@@ -3389,6 +3714,7 @@ BC_NoBGM()
 
 public BC_NormalBGM()
 {
+	client_cmd(0, "mp3 stop")
 	client_cmd(0, "mp3 play ^"sound/basebuilder/FAITH/Normal_BGM2.mp3^"")
 	remove_task(TASK_BGM)
 	set_task(NBGM_LENGTH, "BC_NormalBGM", TASK_BGM)
@@ -3396,6 +3722,7 @@ public BC_NormalBGM()
 
 public BC_BossBGM()
 {
+	client_cmd(0, "mp3 stop")
 	client_cmd(0, "mp3 play ^"sound/basebuilder/FAITH/Boss_BGM.mp3^"")
 	remove_task(TASK_BGM)
 	set_task(BBGM_LENGTH, "BC_BossBGM", TASK_BGM)
@@ -3799,4 +4126,87 @@ db_query(sqlquery[])
 
 	SQL_FreeHandle(conn)
 	SQL_FreeHandle(info)
+}
+
+stock fm_set_kvd(entity, const key[], const value[], const classname[])
+{
+	set_kvd(0, KV_ClassName, classname);
+	set_kvd(0, KV_KeyName, key);
+	set_kvd(0, KV_Value, value);
+	set_kvd(0, KV_fHandled, 0);
+
+	dllfunc(DLLFunc_KeyValue, entity, 0);
+}
+
+stock SetPlayerLight(id, const LightStyle[])
+{
+    if(id != 0)
+    {
+        message_begin(MSG_ONE_UNRELIABLE, SVC_LIGHTSTYLE, .player = id)
+        write_byte(0)
+        write_string(LightStyle)
+        message_end()        
+    } else {
+        message_begin(MSG_BROADCAST, SVC_LIGHTSTYLE)
+        write_byte(0)
+        write_string(LightStyle)
+        message_end()    
+    }
+}
+
+public display_help_info(id)
+{
+	new motd_text[2048], title_text[64], maxlen, len
+	maxlen = charsmax(motd_text)
+	len = 0
+	
+	format(title_text, charsmax(title_text), "基地建设 - 新手帮助")
+	
+	len += format(motd_text[len], maxlen-len, "<html><head><meta charset=UTF-8><style type=^"text/css^">pre{color:#FFB000;}body{background:#000000;margin-left:8px;margin-top:0px;}</style></head><pre><body>")
+	len += format(motd_text[len], maxlen-len, "<b></b>")
+	len += format(motd_text[len], maxlen-len, "======================================^n")
+	len += format(motd_text[len], maxlen-len, "[基地建设]模式 是一个人类vs僵尸的模式.^n")
+	len += format(motd_text[len], maxlen-len, "人类需要在2:30秒内建筑自己的基地, 并在准备时间进入.^n")
+	len += format(motd_text[len], maxlen-len, "抵御僵尸的进攻, 或是成为僵尸的一员, 成败在此一举.^n")
+	len += format(motd_text[len], maxlen-len, "======================================^n")
+	len += format(motd_text[len], maxlen-len, "常用指令: 'E'移动建筑 | 'T'锁定建筑(正版绑定: bb_lock)^n")
+	len += format(motd_text[len], maxlen-len, "'M'打开模式菜单 | 'V'打开玩家菜单 | 'O'打开升级菜单^n")
+	len += format(motd_text[len], maxlen-len, "======================================^n")
+	len += format(motd_text[len], maxlen-len, "各阵营任务：^n")
+	len += format(motd_text[len], maxlen-len, "人类.建造基地 击杀所有僵尸^n")
+	len += format(motd_text[len], maxlen-len, "僵尸.入侵基地 感染所有人类^n")
+	len += format(motd_text[len], maxlen-len, "======================================^n")
+	len += format(motd_text[len], maxlen-len, "服务器特色：^n")
+	len += format(motd_text[len], maxlen-len, "手雷可以炸飞并点燃僵尸, 闪光可以冰冻范围僵尸^n")
+	len += format(motd_text[len], maxlen-len, "人类可以通过造成伤害/击杀僵尸升级, 获得更强能力与更强枪械!^n")
+	len += format(motd_text[len], maxlen-len, "开场会选择一名人类配备M249和更多手雷, 带领人类走向胜利!^n")
+	len += format(motd_text[len], maxlen-len, "僵尸死亡后有几率变为强大的Boss, 利用技能和血量优势杀光人类!^n")
+	len += format(motd_text[len], maxlen-len, "======================================^n")
+	format(motd_text[len], maxlen-len, "</body></pre></html>")
+	
+	show_motd(id, motd_text, title_text)
+	
+	return PLUGIN_HANDLED;
+}
+
+Show_GameTip(TipID)
+{
+    for(new i = 1; i <= MAXPLAYERS; i++)
+    {
+        if(!is_user_valid_connected(i))
+            continue
+
+        if(g_isZombie[i])
+        {
+            PlaySound(i, cfg_szSoundTip[1])
+            set_dhudmessage(225, 75, 35, -1.0, 0.25, 0, 6.0, 6.0, 0.5, 1.0)
+            show_dhudmessage(i, cfg_szGameTip_Zombie[TipID])
+        }
+        else
+        {
+            PlaySound(i, cfg_szSoundTip[0])
+            set_dhudmessage(15, 175, 250, -1.0, 0.25, 0, 6.0, 6.0, 0.5, 1.0)
+            show_dhudmessage(i, cfg_szGameTip_Human[TipID])
+        }
+    }
 }
