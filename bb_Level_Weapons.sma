@@ -22,19 +22,19 @@ new const is_bought_gun[][] = { "未购买", "已购买" }
 // Primary Weapons
 new const pri_gun_type[][] = { "null", "[突击步枪]", "[冲锋枪]", "[冲锋枪]" } // 写[类型]
 new const pri_gun_name[][] = { "null", "416-C Carbine", "Kriss Super V", "爆炎蒸汽 SPSMG" } // 写武器名字
-new const pri_gun_cost[] = { 0, 150, 100, 150 } // 写价格
+new const pri_gun_cost[] = { 0, 150, 100, 150, 150 } // 写价格
 new const pri_gun_code[][] = { "null", "hk416", "kriss", "spsmg" } // 武器代号
 
 // Primary Weapons - HighPlayer
-new const pri_gun_type_hp[][] = { "null", "[狙击枪]" } // 写[类型]
-new const pri_gun_name_hp[][] = { "null", "PGM Hecate II" } // 写武器名字
+new const pri_gun_type_hp[][] = { "null", "[突击步枪]" } // 写[类型]
+new const pri_gun_name_hp[][] = { "null", "地狱犬 Balrog-V" } // 写武器名字
 new const pri_gun_cost_hp[] = { 0, 500 } // 写价格
-new const pri_gun_code_hp[][] = { "null", "hecate" } // 武器代号
+new const pri_gun_code_hp[][] = { "null", "balrogv" } // 武器代号
 
 // Secondrary Weapons
-new const sec_gun_type[][] = { "null", "[榴弹发射器]" }
+new const sec_gun_type[][] = { "null", "[暂时关闭]" }
 new const sec_gun_name[][] = { "null", "FireCracker" }
-new const sec_gun_cost[] = { 0, 100 }
+new const sec_gun_cost[] = { 0, 99999 }
 new const sec_gun_code[][] = { "null", "firecracker" }
 
 new const log_file[] = "BB_FGunBuyLog.txt"
@@ -62,9 +62,12 @@ public plugin_init()
 	register_clcmd("fshophpgun","fshop_gun_hp")
     register_clcmd("fshophandgun","fshop_handgun")
     register_clcmd("fshopother","fshop_other")
+	
     register_clcmd("myfgmenu","myfg_menu")
+	register_clcmd("myfhpgmenu","myfg_menu_hp")
     register_clcmd("myfhgmenu","myfhg_menu")
     register_clcmd("myfomenu","myfo_menu")
+	
     register_clcmd("vipmenu","vip_menu")
     register_clcmd("savefguns", "savefguns")
 	
@@ -183,7 +186,7 @@ public fshop_gun_hp(id) //永久商城主槍械(己列出例子) - HP
 		new menu = menu_create("\r永久商城 - 高玩枪", "fshop2hp_handler");
 				
 		new szTempid[32]
-		for(new i = 1; i < sizeof pri_gun_code; i++)
+		for(new i = 1; i < sizeof pri_gun_code_hp; i++)
 		{
 			new szItems[101]
 			//\g[突击步枪]\y416-C Carbine     \g100 武器点
@@ -674,6 +677,94 @@ public EquipFHGun(id, wpnid)
 	}
 }
 
+public myfg_menu_hp(id)//裝備永久槍(己列出例子)
+{
+	if(g_iSelectPri[id])
+	{
+		client_printc(id, "\y[\g基地建设\y] 你已经选择过主武器了 !")
+		return PLUGIN_HANDLED
+	}
+
+	static menu, option[64]
+	
+	// 416-C Carbine     \r　: \y　己购买
+	menu = menu_create("\r装备永久高玩枪", "my2_handler_hp")
+	new szTempid[32]
+	for(new i = 1; i < sizeof pri_gun_code_hp; i++)
+	{
+		new iSkin = g_iForeverGunHP[id][i]
+		
+		new szItems[101]
+		formatex(szItems, 100, "%s     \r　: 　\y%s", pri_gun_name_hp[i], is_bought_gun[iSkin])
+		num_to_str(i, szTempid, 31)
+		menu_additem(menu, szItems, szTempid, 0)
+	}
+	
+	menu_setprop(menu, MPROP_NUMBER_COLOR, "\r"); 
+	menu_setprop(menu, MPROP_BACKNAME, "返回"); 
+	menu_setprop(menu, MPROP_NEXTNAME, "更多..."); 
+	menu_setprop(menu, MPROP_EXITNAME, "退出"); 
+	menu_setprop(menu, MPROP_EXIT, MEXIT_ALL);
+	
+	menu_display(id, menu, 0);
+	return PLUGIN_HANDLED;
+}
+
+public my2_handler_hp(id, menu, item)
+{
+	if(get_user_team(id) == 1)
+		return PLUGIN_HANDLED
+
+	new sz_Name[ 32 ];
+	
+	get_user_name( id, sz_Name, 31 );
+
+	if(item==MENU_EXIT)
+	{
+		menu_destroy(menu);
+		
+		return PLUGIN_HANDLED;
+	}
+	
+	new data[6], szName[64];
+	new access, callback;
+	
+	menu_item_getinfo(menu, item, access, data, charsmax(data), szName, charsmax(szName), callback);
+	
+	new key = str_to_num(data);
+
+	if(key <= (sizeof pri_gun_code - 1))
+	{
+		EquipFGunHP(id, key)
+	}
+	else 
+	{
+		menu_destroy(menu);
+		return PLUGIN_HANDLED;
+	}
+}
+
+public EquipFGunHP(id, wpnid)
+{
+	switch(wpnid)
+	{
+		case 1:
+		{
+			if (g_iForeverGunHP[id][1])
+			{
+				client_printc(id, "\g[枪械选择] \y你装备了 \g%s\y !", pri_gun_name_hp[1])
+				client_cmd(id, DEF_BGV_CODE)
+				g_iSelectPri[id] = 1
+			}
+			else
+			{
+				client_print(id, print_console, "[BossLevelS] 請先到永久商城購買!!") 
+				client_printc(id, "\g[枪械选择] \y请先到\g 永久商城 \y购买 !!")
+			}
+		}
+	}
+}
+
 public myfo_menu(id)//裝備永久特殊物品(己列出例子)
 {
 	static menu, option[64]
@@ -946,6 +1037,11 @@ public client_disconnect(id)
 	{
 		g_iForeverHandGun[id][i] = 0
 	}
+
+	for(new i=1;i<sizeof pri_gun_code_hp;i++)
+	{
+		g_iForeverGunHP[id][i] = 0
+	}
 }
 
 public client_putinserver(id)
@@ -959,6 +1055,12 @@ public client_putinserver(id)
 	{
 		g_iForeverHandGun[id][i] = 0
 	}
+	
+	for(new i=1;i<sizeof pri_gun_code_hp;i++)
+	{
+		g_iForeverGunHP[id][i] = 0
+	}
+	
 	LoadDatafgun(id)
 	g_iSelectPri[id] = 0
 	g_iSelectSec[id] = 0
@@ -1042,11 +1144,11 @@ public LoadPriFGunHP(id)
 	replace_all(authid, 32, "`", "\`")
 	replace_all(authid, 32, "'", "\'")
 
-	result = dbi_query(sql, "SELECT hecate FROM bb_weapons_hp WHERE name='%s'", authid)
+	result = dbi_query(sql, "SELECT balrogv FROM bb_weapons_hp WHERE name='%s'", authid)
 
 	if(result == RESULT_NONE)
 	{
-		dbi_query(sql, "INSERT INTO bb_weapons(name,hecate) VALUES('%s','0')", authid)
+		dbi_query(sql, "INSERT INTO bb_weapons_hp(name,balrogv) VALUES('%s','0')", authid)
 	}
 	else if(result <= RESULT_FAILED)
 	{

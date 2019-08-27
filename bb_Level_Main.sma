@@ -15,10 +15,10 @@
 native zp_donater_get_level(id)
 
 #define PLUGIN "[BB] Level: Main"
-#define VERSION "1.0 Beta"
-#define AUTHOR "EmeraldGhost"
+#define VERSION "1.63"
+#define AUTHOR "EmeraldGhost & NightCat"
 
-#define TASK_STATUS_HUD 233
+#define TASK_STATUS_HUD 161713
 #define TASK_INIT_SKILL 2357
 
 enum
@@ -59,7 +59,7 @@ new g_has_unlimited_clip[33], g_uccountingdown[33]
 
 // -- Killer 刺客
 new const killer_skills[][] = { "null", "[主动]隐刃", "[主动]疾步", "[被动]锋芒" }
-new const killer_skills_info[][] = { "null", "隐身 5 秒(可用1+等级次)", "加速 5 秒(可用1+等级次)", "每级增加刀伤害 150 点(基础伤害1000)" }
+new const killer_skills_info[][] = { "null", "隐身 5 秒(可用1+等级次)", "加速 5 秒(可用1+等级次)", "每级增加刀伤害 150 点(基础伤害1000点)" }
 new const killer_skills_cost[] = { 0, 50, 50, 100 }
 new const killer_initskill[][] = { "null", "隐刃", "疾步" }
 
@@ -91,16 +91,16 @@ enum (+= 2333)
 }
 
 // -- Max Upgrade Level Settings
-#define MaxLevel_Health		50
-#define MaxLevel_Speed		20
-#define MaxLevel_Gravity	    0
-#define MaxLevel_Damage	50
+#define MaxLevel_Health 	50
+#define MaxLevel_Speed 		20
+#define MaxLevel_Gravity 	0
+#define MaxLevel_Damage 	5
 
 // -- Per Level Settings
 #define Health_PerLevel		1
 #define Speed_PerLevel		1
 #define Gravity_PerLevel	0.0125
-#define Damage_PerLevel	0.01
+#define Damage_PerLevel		0.01
 
 #define MAXLEVEL 300
 #define MAXBLEVEL 5
@@ -116,6 +116,8 @@ new g_level[33]
 new g_sp[33]
 new g_gp[33]
 
+new g_hecount, g_frostcount
+
 new CKXP
 new CKCH
 new TKXP
@@ -127,10 +129,6 @@ new g_HealthLevel[33]
 new g_SpeedLevel[33]
 new g_GravityLevel[33]
 new g_DamageLevel[33]
-new g_skpH[33]
-new g_skpS[33]
-new g_skpG[33]
-new g_skpD[33]
 new Float:fGravity
 
 new const log_file[] = "BB_AdminsDoWt.txt"
@@ -219,10 +217,10 @@ public plugin_init()
     register_menucmd(register_menuid("Passive Upgrades"), 1023, "Action_PassiveUpgrades")
     
 	// -- Damage Variables
-    CKXP = register_cvar("CT_KillEXP", "100")	//默认 100
-    CKCH = register_cvar("CT_KillCash", "1")	//默认 1
+    CKXP = register_cvar("CT_KillEXP", "200")	//默认 100
+    CKCH = register_cvar("CT_KillCash", "2")	//默认 1
     TKXP = register_cvar("T_KillEXP", "200")	//默认 200
-    TKCH = register_cvar("T_KillCash", "2")		//默认 2
+    TKCH = register_cvar("T_KillCash", "5")		//默认 2
     DXP = register_cvar("D_EXP", "50")			//默认 50
     DCH = register_cvar("D_Cash", "1")			//默认 1
     
@@ -272,6 +270,12 @@ public ev_ResetHud(id)
 	iPlayerMainSkillUsed[id][1] = 0
 	iPlayerMainSkillUsed[id][2] = 0
 	
+	if(g_DamageLevel[id] > MaxLevel_Damage)
+	{
+		client_printc(0, "\y[\g等级系统\y]   检测到技能属性异常, 已将您的技能重置 .");
+		Resetskill(id);
+	}
+	
 	if(iPlayerJob[id] == JOB_MAGICAL && iPlayerJobSkill[id][SKILL_FROSTGAIN] > 0)
 	{
 		remove_task(id + TASKID_FROSTGAIN)
@@ -281,7 +285,9 @@ public ev_ResetHud(id)
 
 public ev_RoundStart()
 {
-	client_printc(0, "\y[\g基地建设\y] 您可以按'M'打开玩家菜单, 按'O'打开升级主菜单.");
+	//client_printc(0, "\y[\g基地建设\y]   您可以按'M'打开玩家菜单, 按'O'打开升级主菜单.");
+	g_hecount = 0;
+	g_frostcount = 0;
 	set_task(1.0, "ReCheckPlayerNum")
 }
 
@@ -293,16 +299,16 @@ public ReCheckPlayerNum()
 	if(g_iPlayerCount >= 16)
 	{
 		g_iPlayerBonus = 3
-		client_printc(0, "\y[\g人数检测\y] 当前在线玩家人数大于 \t16 \y人, 所有人获取\tEXP&点数\y获得 \t3\y 倍加成.");
+		client_printc(0, "\y[\g人数检测\y]   当前在线玩家人数大于 \t16 \y人, 获取\tEXP&点数\y获得 \t3\y 倍加成.");
 	}
 	else if(g_iPlayerCount >= 8)
 	{
 		g_iPlayerBonus = 2
-		client_printc(0, "\y[\g人数检测\y] 当前在线玩家人数大于 \t8 \y人, 所有人获取\tEXP&点数\y获得 \t2\y 倍加成.");
+		client_printc(0, "\y[\g人数检测\y]   当前在线玩家人数大于 \t8 \y人, 获取\tEXP&点数\y获得 \t2\y 倍加成.");
 	}
 
 	g_iPlayerBonus *= 2
-	client_printc(0, "\y[\g新年活动\y] 新年快乐! 玩的开心! EXP&点数 2 倍加成 !");
+	client_printc(0, "\y[\g人数检测\y]   放暑假了放暑假了! EXP&点数 获取双倍!");
 }
 
 public event_CurWeapon(id)
@@ -368,7 +374,7 @@ public cmdHumanSkill(id)
 			for(new i = 1; i < sizeof killer_initskill; i++)
 			{
 				new szItems[101]
-				formatex(szItems, 100, "\y%s - \r%s[余 %d 次]", killer_initskill[i], iPlayerJobSkill[id][i] - iPlayerMainSkillUsed[id][i])
+				formatex(szItems, 100, "\y%s - \r[余 %d 次]", killer_initskill[i], iPlayerJobSkill[id][i]+1 - iPlayerMainSkillUsed[id][i])
 				num_to_str(i, szTempid, 31)
 				menu_additem(menu, szItems, szTempid, 0)
 			}
@@ -379,7 +385,7 @@ public cmdHumanSkill(id)
 			for(new i = 1; i < sizeof magical_initskill; i++)
 			{
 				new szItems[101]
-				formatex(szItems, 100, "\y%s - \r[余 %d 次]", magical_initskill[i], iPlayerJobSkill[id][i] - iPlayerMainSkillUsed[id][i])
+				formatex(szItems, 100, "\y%s - \r[余 %d 次]", magical_initskill[i], iPlayerJobSkill[id][i]+1 - iPlayerMainSkillUsed[id][i])
 				num_to_str(i, szTempid, 31)
 				menu_additem(menu, szItems, szTempid, 0)
 			}
@@ -530,7 +536,7 @@ public uammo_countdown(taskid)
 		return;
 	}
 
-	client_print(id, print_center, "无限子弹, 剩余 %d 秒", g_uccountingdown[id])
+	client_print(id, print_center, "[ 无尽怒火 | %d 秒 ]", g_uccountingdown[id])
 	g_uccountingdown[id] --
 	set_task(1.0, "uammo_countdown", id + TASK_INIT_SKILL)
 }
@@ -629,7 +635,7 @@ public cmd_give_exp(id, level, cid)
 					}
 				}
 				
-				client_printc(0, "\g[等級系統] \t管理员\y%s\t给予了\y %d \t经验給 \y所有人 \t!!", name, str_to_num(arg_amount))
+				client_printc(0, "\g[等級系統]   \t管理员\y%s\t给予了\y %d \t经验給 \y所有人 \t!!", name, str_to_num(arg_amount))
 				log_to_file(log_file, "管理员 %s 赠送所有人 %d 经验", name, str_to_num(arg_amount))
 				return PLUGIN_HANDLED;
 			}
@@ -644,7 +650,7 @@ public cmd_give_exp(id, level, cid)
 
              g_xp[target] += str_to_num(arg_amount) 
 
-	     client_printc(0, "\g[等級系統]\t管理員\y%s\t給予了\y %d \t經驗給 \y%s \t!!", name, str_to_num(arg_amount) , arg_name)
+	     client_printc(0, "\g[等級系統]   \t管理員\y%s\t給予了\y %d \t經驗給 \y%s \t!!", name, str_to_num(arg_amount) , arg_name)
 
 	log_to_file(log_file, "[等級系統]管理員 %s 給予了 %d 經驗給 %s .", name, str_to_num(arg_amount) , arg_name)
 
@@ -676,7 +682,7 @@ public cmd_give_bexp(id, level, cid)
 
              g_BattleExp[target] += str_to_num(arg_amount) 
 
-	     client_printc(0, "\g[等級系統]\t管理員\y%s\t給予了\y %d \t战斗經驗給 \y%s \t!!", name, str_to_num(arg_amount) , arg_name)
+	     client_printc(0, "\g[等級系統]   \t管理員\y%s\t給予了\y %d \t战斗經驗給 \y%s \t!!", name, str_to_num(arg_amount) , arg_name)
 
 	log_to_file(log_file, "[等級系統]管理員 %s 給予了 %d 战斗經驗給 %s .", name, str_to_num(arg_amount) , arg_name)
 
@@ -711,7 +717,7 @@ public cmd_give_cash(id, level, cid)
 					}
 				}
 				
-				client_printc(0, "\g[等級系統] \t管理员\y%s\t给予了\y %d \tCash 给 \y所有人 \t!!", name, str_to_num(arg_amount))
+				client_printc(0, "\g[等級系統]   \t管理员\y%s\t给予了\y %d \tCash 给 \y所有人 \t!!", name, str_to_num(arg_amount))
 				log_to_file(log_file, "管理员 %s 赠送所有人 %d Cash", name, str_to_num(arg_amount))
 				return PLUGIN_HANDLED;
 			}
@@ -726,7 +732,7 @@ public cmd_give_cash(id, level, cid)
              
              g_cash[target] += str_to_num(arg_amount)
 
-	     client_printc(0, "\g[等級系統]\t管理員\y%s\t給予了\y %d \t點數給 \y%s \t!!", name, str_to_num(arg_amount) , arg_name)
+	     client_printc(0, "\g[等級系統]   \t管理員\y%s\t給予了\y %d \t點數給 \y%s \t!!", name, str_to_num(arg_amount) , arg_name)
 
 	log_to_file(log_file, "[等級系統]管理員 %s 給予了 %d 点数給 %s .", name, str_to_num(arg_amount) , arg_name)
 
@@ -761,7 +767,7 @@ public cmd_give_gp(id, level, cid)
 					}
 				}
 				
-				client_printc(0, "\g[等級系統] \t管理员\y%s\t给予了\y %d \t武器点 给 \y所有人 \t!!", name, str_to_num(arg_amount))
+				client_printc(0, "\g[等級系統]   \t管理员\y%s\t给予了\y %d \t武器点 给 \y所有人 \t!!", name, str_to_num(arg_amount))
 				log_to_file(log_file, "管理员 %s 赠送所有人 %d 武器点", name, str_to_num(arg_amount))
 				return PLUGIN_HANDLED;
 			}
@@ -776,7 +782,7 @@ public cmd_give_gp(id, level, cid)
              
              g_gp[target] += str_to_num(arg_amount)
 
-	     client_printc(0, "\g[等級系統]\t管理員\y%s\t給予了\y %d \t武器点給 \y%s \t!!", name, str_to_num(arg_amount) , arg_name)
+	     client_printc(0, "\g[等級系統]   \t管理員\y%s\t給予了\y %d \t武器点給 \y%s \t!!", name, str_to_num(arg_amount) , arg_name)
 
 	log_to_file(log_file, "[等級系統]管理員 %s 給予了 %d 武器点給 %s .", name, str_to_num(arg_amount) , arg_name)
 
@@ -808,7 +814,7 @@ public cmd_give_points(id, level, cid)
              
              g_sp[target] += str_to_num(arg_amount)
 
-	     client_printc(0, "\g[等級系統]\t管理員\y%s\t給予了\y %d \t技能點給 \y%s \t!!", name, str_to_num(arg_amount) , arg_name)
+	     client_printc(0, "\g[等級系統]   \t管理員\y%s\t給予了\y %d \t技能點給 \y%s \t!!", name, str_to_num(arg_amount) , arg_name)
 
 	log_to_file(log_file, "[等級系統]管理員 %s 給予了 %d 經驗給 %s .", name, str_to_num(arg_amount) , arg_name)
 
@@ -817,14 +823,15 @@ public cmd_give_points(id, level, cid)
 
 public Resetskill(id)
 {
+	g_sp[id] = g_level[id]
 	g_HealthLevel[id] = 0
 	g_SpeedLevel[id] = 0
 	g_GravityLevel[id] = 0
 	g_DamageLevel[id] = 0
-	g_skpH[id] = 1
-	g_skpS[id] = 2
-	g_skpG[id] = 15
-	g_skpD[id] = 4
+	iPlayerJobSkill[id][1] = 0
+	iPlayerJobSkill[id][2] = 0
+	iPlayerJobSkill[id][3] = 0
+	iPlayerJob[id] = 0
 }
 
 add_health(id, value) 
@@ -841,13 +848,13 @@ public savecmd(id)
 {
  SaveData(id) 
  client_cmd(id, "savefguns")
- client_printc(id, "\g[等級系統]\t手動存檔成功!")
+ client_printc(id, "\g[等级系统]   \y手动存档成功!")
 } 
 
 public client_putinserver(id)
 {
 	Reset_Data(id)
-	set_task(0.5, "status_hud", id + TASK_STATUS_HUD)
+	set_task(1.0, "status_hud", id + TASK_STATUS_HUD)
 	LoadLevel(id)
 	LoadSkills(id)
 	client_cmd(id, "bind o buyequip")
@@ -865,10 +872,6 @@ public Reset_Data(id)
 	g_SpeedLevel[id] = 0
 	g_GravityLevel[id] = 0
 	g_DamageLevel[id] = 0
-	g_skpH[id] = 1
-	g_skpS[id] = 2
-	g_skpG[id] = 15
-	g_skpD[id] = 4
 	g_xp[id] = 0
 	g_level[id] = 0
 	g_cash[id] = 0
@@ -877,6 +880,9 @@ public Reset_Data(id)
 	g_BattleExp[id] = 0
 	g_BattleLvl[id] = 0
 	iPlayerJob[id] = 0
+	iPlayerJobSkill[id][1] = 0
+	iPlayerJobSkill[id][2] = 0
+	iPlayerJobSkill[id][3] = 0
 }
 
 public function(id)
@@ -1032,10 +1038,10 @@ public native_set_user_sp(id, amount)  //點數
 
 public fw_PlayerPreThink(id)
 {
-    if (g_BattleExp[id] >= ((g_BattleLvl[id] + 1) * 500) && g_BattleLvl[id] < MAXBLEVEL)
+    if (g_BattleExp[id] >= ((g_BattleLvl[id] + 1) * 1000) && g_BattleLvl[id] < MAXBLEVEL)
 	{
     g_BattleLvl[id] ++
-	client_printc(id, "\g[等级系统]\y 你的战斗熟练已经升至 \y%d \t等级.", g_BattleLvl[id])
+	client_printc(id, "\y[\g等级系统\y]   你的战斗熟练已经升至 \g%d \y等级.", g_BattleLvl[id])
 	}
 	   
 	// 公式：等级 * 2150 + 等级 / 10
@@ -1044,7 +1050,7 @@ public fw_PlayerPreThink(id)
 	g_level[id] ++
     g_cash[id] += 10
     g_sp[id] += 1
-	client_printc(id, "\g[等级系统]\y 你已经升至\g[ %d ]\y等级, 并获得\g10\y Cash & \g1\y 技能点作为奖励!", g_level[id])
+	client_printc(id, "\y[\g等级系统\y]   你已经升至\g %d \y等级, 并获得\g 10\y Cash & \g1\y 技能点作为奖励!", g_level[id])
 	}
 }
 
@@ -1071,7 +1077,7 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 				if(iNum == random_num(1, iMaxNum))
 				{
 					z4e_burn_set(victim, 5.0, 0)
-					client_printc(attacker, "\g[职业技能] \t<火焰子弹> \y已触发! 被击中僵尸燃烧 \t5\y 秒.")
+					client_printc(attacker, "\y[\g职业技能\y]   \t<火焰子弹> \y已触发! 被击中僵尸燃烧 \t5\y 秒.")
 					client_printc(victim, "\t你被 [枪械大师] 的 <火焰子弹> 击中了! 你将会燃烧 5 秒.")
 				}
 			}
@@ -1080,12 +1086,11 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 		{
 			if(iPlayerJobSkill[attacker][SKILL_KNIFEDMG] > 0)
 			{
-				if((get_user_weapon(attacker, _, _) == CSW_KNIFE) && (damage_type & DMG_KNIFE) && damage >= 65.0)
+				if((get_user_weapon(attacker, _, _) == CSW_KNIFE) && (damage_type & DMG_KNIFE) && !(pev(victim, pev_flags) & FL_DUCKING) && damage >= 65.0)
 				{
-					new Float:NewDamage = (float(iPlayerJobSkill[attacker][SKILL_KNIFEDMG] - 1) * 150.0) + 1000.0
-					damage = NewDamage
-					client_printc(attacker, "\g[职业技能] \t<锋芒> \y已触发! 对目标造成 \t%d \y点伤害.", floatround(NewDamage))
-					client_printc(victim, "\t你被 [刺客] 捅了一刀! 他对你造成了 %d 点伤害.", floatround(NewDamage))
+					damage = (float(iPlayerJobSkill[attacker][SKILL_KNIFEDMG] - 1) * 150.0) + 1000.0
+					client_printc(attacker, "\y[\g职业技能\y]   \t<锋芒> \y已触发! 对目标造成 \t%d \y点伤害.", floatround(damage))
+					client_printc(victim, "\t你被 [刺客] 捅了一刀! 他对你造成了 %d 点伤害.", floatround(damage))
 				}
 			}
 		}
@@ -1097,19 +1102,19 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
     }
 	
 	new RewardMultiply = 0
-	if (g_damage[attacker] >= 4000)
+	if (g_damage[attacker] >= 4500)
     { 
-     g_damage[attacker] -= 4000    // 把 攻擊者的g_damage 變回做 0 
+     g_damage[attacker] -= 4500    // 把 攻擊者的g_damage 變回做 0 
 	 RewardMultiply = 4
     } 
-    else if (g_damage[attacker] >= 2000)
+    else if (g_damage[attacker] >= 3000)
     { 
-     g_damage[attacker] -= 2000    // 把 攻擊者的g_damage 變回做 0 
+     g_damage[attacker] -= 3000    // 把 攻擊者的g_damage 變回做 0 
 	 RewardMultiply = 2
     } 
-    else if (g_damage[attacker] >= 1000)
+    else if (g_damage[attacker] >= 1500)
     { 
-     g_damage[attacker] -= 1000    // 把 攻擊者的g_damage 變回做 0
+     g_damage[attacker] -= 1500    // 把 攻擊者的g_damage 變回做 0
 	 RewardMultiply = 1
     }
 	
@@ -1121,7 +1126,7 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 		g_xp[attacker] += get_pcvar_num(DXP) * RewardMultiply * g_iPlayerBonus
 		g_cash[attacker] += get_pcvar_num(DCH) * RewardMultiply * g_iPlayerBonus
 		g_BattleExp[attacker] += RewardMultiply
-		client_print(attacker, print_center, "EXP + %d  &  Cash + %d", get_pcvar_num(DXP) * RewardMultiply * g_iPlayerBonus, get_pcvar_num(DCH) * RewardMultiply * g_iPlayerBonus)
+		client_print(attacker, print_center, "EXP + %d  |  Cash + %d", get_pcvar_num(DXP) * RewardMultiply * g_iPlayerBonus, get_pcvar_num(DCH) * RewardMultiply * g_iPlayerBonus)
 		
 		function(attacker)
 	}
@@ -1132,6 +1137,9 @@ public fw_TakeDamage(victim, inflictor, attacker, Float:damage, damage_type)
 // 寒能积蓄
 public Task_Frostgain(id)
 {
+	if(get_user_team(id) == 1)
+		return PLUGIN_HANDLED;
+
 	if(iPlayerJobSkill[id][SKILL_FROSTGAIN] > 0)
 	{
 		set_task(70.0 - float(iPlayerJobSkill[id][SKILL_FROSTGAIN]), "Give_Flash" ,id + TASKID_FROSTGAIN)
@@ -1169,13 +1177,13 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
     {
     	g_xp[attacker] += get_pcvar_num(CKXP) * g_iPlayerBonus
     	g_cash[attacker] += get_pcvar_num(CKCH) * g_iPlayerBonus
-    	client_printc(attacker, "\y[\g击杀奖励\y] 你杀死了一只僵尸! 获得了\g %d \y经验 ,\g %d \yCash !!", get_pcvar_num(CKXP) * g_iPlayerBonus, get_pcvar_num(CKCH) * g_iPlayerBonus)
+    	client_printc(attacker, "\y[\g击杀奖励\y]   你杀死了一只僵尸! 获得了\g %d \y经验 ,\g %d \yCash !!", get_pcvar_num(CKXP) * g_iPlayerBonus, get_pcvar_num(CKCH) * g_iPlayerBonus)
     }
     else if(cs_get_user_team(attacker) == CS_TEAM_T)
     {
     	g_xp[attacker] += get_pcvar_num(TKXP) * g_iPlayerBonus
     	g_cash[attacker] += get_pcvar_num(TKCH) * g_iPlayerBonus
-    	client_printc(attacker, "\y[\g击杀奖励\y] 你感染了一名人类! 获得了\g %d \y经验 ,\g %d \yCash !", get_pcvar_num(TKXP) * g_iPlayerBonus, get_pcvar_num(TKCH) * g_iPlayerBonus)
+    	client_printc(attacker, "\y[\g击杀奖励\y]   你感染了一名人类! 获得了\g %d \y经验 ,\g %d \yCash !", get_pcvar_num(TKXP) * g_iPlayerBonus, get_pcvar_num(TKCH) * g_iPlayerBonus)
     }
 	
 	function(attacker)
@@ -1186,21 +1194,20 @@ public fw_PlayerKilled(victim, attacker, shouldgib)
 public status_hud(taskid)
 {
 	new id = taskid - TASK_STATUS_HUD
-
-       new name[33]
-	   get_user_name(id, name, 32)
 	   
 	    if(is_user_alive(id))
 	    {
 			if(get_user_team(id) == 2)
            {
-				set_hudmessage(0, 100, 5, 0.7, 0.65, 0, 0.0, 1.0, 0.1, 0.1, 4)
-                ShowSyncHudMsg(id, g_statushud, "[ 玩家: %s ]^n[ 等级: %d | 经验值: %d / %d ]^n[ 技能点: %d | Cash: %d | 武器点: %d ]^n[ 战斗熟练度: %d 级 | %d / %d ]^n[ 职业: %s ]^n[ 回合伤害: %d HP ]", name, g_level[id], g_xp[id] ,((g_level[id] + 1) * 2150 + floatround(float(g_level[id] + 1) / 10.0)), g_sp[id], g_cash[id], g_gp[id], g_BattleLvl[id], g_BattleExp[id], (g_BattleLvl[id] + 1) * 500, szJobName[iPlayerJob[id]], g_RoundDamage[id])
+				set_hudmessage(0, 200, 0, 0.7, 0.65, 0, 0.0, 5.0, 0.1, 0.1, 3)
+                ShowSyncHudMsg(id, g_statushud, "[ 等级: %d ]^n[ 经验值: %d / %d | 技能点: %d ]^n[ Cash: %d | 武器点: %d ]^n[ 战斗熟练度: %d 级 | %d / %d ]^n[ 职业: %s ]^n[ 回合伤害: %d HP ]", g_level[id], g_xp[id] ,((g_level[id] + 1) * 2150 + floatround(float(g_level[id] + 1) / 10.0)), g_sp[id], g_cash[id], g_gp[id], g_BattleLvl[id], g_BattleExp[id], (g_BattleLvl[id] + 1) * 1000, szJobName[iPlayerJob[id]], g_RoundDamage[id])
+				//show_hudmessage(id, "[ 等级: %d ]^n[ 经验值: %d / %d | 技能点: %d ]^n[ Cash: %d | 武器点: %d ]^n[ 战斗熟练度: %d 级 | %d / %d ]^n[ 职业: %s ]^n[ 回合伤害: %d HP ]", g_level[id], g_xp[id] ,((g_level[id] + 1) * 2150 + floatround(float(g_level[id] + 1) / 10.0)), g_sp[id], g_cash[id], g_gp[id], g_BattleLvl[id], g_BattleExp[id], (g_BattleLvl[id] + 1) * 1000, szJobName[iPlayerJob[id]], g_RoundDamage[id])
 		   }
            else if(get_user_team(id) == 1)
            {
-				set_hudmessage(0, 100, 5, 0.7, 0.65, 0, 0.0, 1.0, 0.1, 0.1, 4)
-                ShowSyncHudMsg(id, g_statushud, "[ 玩家: %s ]^n[ 等级: %d | 经验值: %d / %d ]^n[ 技能点: %d | Cash: %d | 武器点: %d ]^n[ 战斗熟练度: %d 级 | %d / %d ]", name, g_level[id], g_xp[id] ,((g_level[id] + 1) * 2150 + floatround(float(g_level[id] + 1) / 10.0)), g_sp[id], g_cash[id], g_gp[id], g_BattleLvl[id], g_BattleExp[id], (g_BattleLvl[id] + 1) * 500)
+				set_hudmessage(0, 200, 0, 0.7, 0.65, 0, 0.0, 5.0, 0.1, 0.1, 3)
+                ShowSyncHudMsg(id, g_statushud, "[ 等级: %d ]^n[ 经验值: %d / %d | 技能点: %d ]^n[ Cash: %d | 武器点: %d ]^n[ 战斗熟练度: %d 级 | %d / %d ]", g_level[id], g_xp[id] ,((g_level[id] + 1) * 2150 + floatround(float(g_level[id] + 1) / 10.0)), g_sp[id], g_cash[id], g_gp[id], g_BattleLvl[id], g_BattleExp[id], (g_BattleLvl[id] + 1) * 1000)
+				//show_hudmessage(id, "[ 等级: %d ]^n[ 经验值: %d / %d | 技能点: %d ]^n[ Cash: %d | 武器点: %d ]^n[ 战斗熟练度: %d 级 | %d / %d ]", g_level[id], g_xp[id] ,((g_level[id] + 1) * 2150 + floatround(float(g_level[id] + 1) / 10.0)), g_sp[id], g_cash[id], g_gp[id], g_BattleLvl[id], g_BattleExp[id], (g_BattleLvl[id] + 1) * 1000)
 		   }
 		   
 		   set_task(1.0, "status_hud", id + TASK_STATUS_HUD)
@@ -1211,11 +1218,11 @@ public cmdChooseteam(id)
 {
 		if(g_iSQLInit == 0)
 		{
-			client_printc(id, "\y[\g基地建设\y] SQL 初始化失败! 请联系管理员处理!")
+			client_printc(id, "\y[\g基地建设\y]   SQL 初始化失败! 请联系管理员处理!")
 			return PLUGIN_HANDLED;
 		}
 
-		new menu = menu_create("\r基地建设升级 v1.5 Fin.A^n制作：CyberTech Dev Team.", "menu_handler");
+		new menu = menu_create("\r基地建设等级系统 v1.62 ReStart^n制作：CyberTech Dev Team.", "menu_handler");
 				
 		menu_additem(menu, "等级系统", "1", 0);
 		menu_additem(menu, "道具商城", "2", 0);
@@ -1345,7 +1352,7 @@ public exchange_m(id, menu, item)
 			}
 			else
 			{
-			client_printc(id, "\g[点数转换] \y你的\t Cash \y不足!!")
+			client_printc(id, "\g[点数转换]   \y你的\t Cash \y不足!!")
 			return PLUGIN_HANDLED;
 			}
 		}
@@ -1359,7 +1366,7 @@ public exchange_m(id, menu, item)
 			}
 			else
 			{
-			client_printc(id, "\g[点数转换] \y你的\t Cash \y不足!!")
+			client_printc(id, "\g[点数转换]   \y你的\t Cash \y不足!!")
 			return PLUGIN_HANDLED;
 			}
 		}
@@ -1373,7 +1380,7 @@ public exchange_m(id, menu, item)
 			}
 			else
 			{
-			client_printc(id, "\g[点数转换] \y你的\t Cash \y不足!!")
+			client_printc(id, "\g[点数转换]   \y你的\t Cash \y不足!!")
 			return PLUGIN_HANDLED;
 			}
 		}
@@ -1387,7 +1394,7 @@ public exchange_m(id, menu, item)
 			}
 			else
 			{
-			client_printc(id, "\g[点数转换] \y你的\t 武器点 \y不足!!")
+			client_printc(id, "\g[点数转换]   \y你的\t 武器点 \y不足!!")
 			return PLUGIN_HANDLED;
 			}
 		}
@@ -1401,7 +1408,7 @@ public exchange_m(id, menu, item)
 			}
 			else
 			{
-			client_printc(id, "\g[点数转换] \y你的\t 武器点 \y不足!!")
+			client_printc(id, "\g[点数转换]   \y你的\t 武器点 \y不足!!")
 			return PLUGIN_HANDLED;
 			}
 		}
@@ -1490,24 +1497,7 @@ public fwHamPlayerSpawnPost(id)
 			fGravity = g_GravityLevel[id] * Gravity_PerLevel
 			set_gravity(id, fGravity)
 		}
-		if(g_skpH[id] == 0)
-		{
-			g_skpH[id] = 1
-		}
-		if(g_skpS[id] == 0)
-		{
-			g_skpS[id] = 2
-		}
-		if(g_skpG[id] == 0)
-		{
-			g_skpG[id] = 15
-		}
-		if(g_skpD[id] == 0)
-		{
-			g_skpD[id] = 4
-		}
 		
-		cs_reset_user_model(id)
 		strip_user_weapons(id)
 		give_item(id, "weapon_knife")
 	}
@@ -1605,7 +1595,7 @@ public level_handler(id, menu, item)
 		{
 			if(g_level[id] < 200)
 			{
-				client_printc(id, "\g[职业系统] \y你的等级不足 \t200 \y级, 无法进入!")
+				client_printc(id, "\g[职业系统]   \y你的等级不足 \t200 \y级, 无法进入!")
 			}
 			else if(iPlayerJob[id] == 0 && g_level[id] >= 200)
 			{
@@ -1630,12 +1620,18 @@ public level_handler(id, menu, item)
 
 public shop_menu(id)
 {
-		new menu = menu_create("\r点数商城", "shop_handler");
+		static option[64]
+		new menu = menu_create("\r道具商城", "shop_handler");
 				
-		menu_additem(menu, "\y轻功药水 \r         | \w暂时关闭", "1", 0);
-		menu_additem(menu, "\y复活 \r(等级200以下) | \w1 武器点", "2", 0);
-		menu_additem(menu, "\y高爆破片雷 \r            | \w50 Cash^n^n", "3", 0);
-		menu_additem(menu, "返回主目錄", "5", 0);
+		//Napalm Nade [%d/2]     | 1 武器点
+		//Frost Nade  [%d/5]     | 20 Cash
+		//购买复活   (200级以下)  | 1 武器点
+		formatex(option, charsmax(option), "\yNapalm Nade\r [%d/2]     | \w1 武器点", g_hecount)
+		menu_additem(menu, option, "1", 0);
+		formatex(option, charsmax(option), "\yFrost Nade\r    [%d/5]     | \w20 Cash", g_frostcount)
+		menu_additem(menu, option, "2", 0);
+		menu_additem(menu, "\y购买复活   \r(200级以下)  | \w1 武器点^n^n", "3", 0);
+		menu_additem(menu, "返回主菜单", "5", 0);
 		
 		menu_setprop(menu, MPROP_NUMBER_COLOR, "\r"); 
 		menu_setprop(menu, MPROP_BACKNAME, "返回"); 
@@ -1674,58 +1670,78 @@ public shop_handler(id, menu, item)
 	{
 		case 1:
 		{
-	  		if(g_gp[id] >= 99999)
+			if(g_hecount >= 2)
 			{
-			 client_printc(id, "\g[点数商城]\t己成功購買了\y低重力藥水\g!!")
-			 g_gp[id] -=2
-			 set_user_gravity(id, 0.7)
+				client_printc(id, "\y[\g道具商城\y]   道具 \tNapalm Nade \y团队购买次数已到当局限额!")
+				return PLUGIN_HANDLED
+			}
+
+	  		if(g_gp[id] >= 1)
+			{
+				client_printc(id, "\y[\g道具商城\y]   购买道具 \tNapalm Nade \y成功!")
+				g_gp[id] --
+				give_item(id, "weapon_hegrenade")
+
+				g_hecount ++
 			} 
 			else
 			{
-			 client_printc(id, "\g[点数商城]\t你沒有足夠的 \y武器点\g!!")
-			 //menu_destroy(menu);
-			 return PLUGIN_HANDLED
-			} 
+				client_printc(id, "\y[\g道具商城\y]   你没有足够的\g 武器点 \y!")
+				return PLUGIN_HANDLED
+			}
 		}
 		case 2:
 		{
-			if(is_user_alive(id)) 
-			{ 
-			 client_printc(id, "\g[點數商城]\t你還活著,不能購買\y復活\t!!")
-			 return PLUGIN_HANDLED 
+			if(g_frostcount >= 5)
+			{
+				client_printc(id, "\y[\g道具商城\y]   道具 \tFrost Nade \y团队购买次数已到当局限额!")
+				return PLUGIN_HANDLED
 			}
-	  		if(g_gp[id] < 1)
+
+	  		if(g_cash[id] >= 20)
 			{
-			 client_printc(id, "\g[點數商城]\t你沒有足夠的\y武器點\t!!")
-			 return PLUGIN_HANDLED 
+				client_printc(id, "\y[\g道具商城\y]   购买道具 \tFrost Nade \y成功!")
+				g_cash[id] -= 20;
+
+				new Flash = cs_get_user_bpammo(id, CSW_FLASHBANG)
+				if(Flash < 1)
+				{
+					if(!Flash)
+						give_item (id, "weapon_flashbang");
+					else
+						cs_set_user_bpammo(id, CSW_FLASHBANG, cs_get_user_bpammo(id, CSW_FLASHBANG) + 1);
+				}
+
+				g_frostcount ++
 			} 
-	  		if(g_level[id] > 200)
+			else
 			{
-			 client_printc(id, "\g[點數商城]\t你的等級己大於\y200\t等!!")
-			 return PLUGIN_HANDLED 
-			} 
-			if(cs_get_user_deaths(id)) 
-			{ 
-	    		 g_gp[id] -=1
-			 client_printc(id, "\g[點數商城]\t你己成功購買了\y復活\t!!")
-			 ExecuteHam(Ham_CS_RoundRespawn,id); 
-                         spawn(id) 
-			 //menu_destroy(menu);
+				client_printc(id, "\y[\g道具商城\y]   你没有足够的\g 武器点 \y!")
+				return PLUGIN_HANDLED
 			} 
 		}
 		case 3:
 		{
-	  		if(g_cash[id] >= 50)
+			if(is_user_alive(id)) 
+			{ 
+				client_printc(id, "\y[\g道具商城\y]   你还 \t活着\y, 无法购买复活 !")
+				return PLUGIN_HANDLED 
+			}
+	  		if(g_gp[id] < 1)
 			{
-			 client_printc(id, "\g[點數商城]\t己成功購買了\y高爆破片雷\t!!")
-			 g_cash[id] -= 50
-			give_item(id, "weapon_hegrenade")
+				client_printc(id, "\y[\g道具商城\y]   你没有足够的 \t武器点 \y!")
+				return PLUGIN_HANDLED 
 			} 
-			else
+	  		if(g_level[id] > 200)
 			{
-			 client_printc(id, "\g[點數商城]\y你沒有足夠的\t Cash \y!!")
-			 //menu_destroy(menu);
-			 return PLUGIN_HANDLED
+				client_printc(id, "\y[\g道具商城\y]   你的等级已经超过 \t200 \y级!")
+				return PLUGIN_HANDLED 
+			} 
+			if(cs_get_user_deaths(id)) 
+			{ 
+				g_gp[id] -=1
+				client_printc(id, "\y[\g道具商城\y]   你己成功购买了 \t复活\y !")
+				ExecuteHam(Ham_CS_RoundRespawn,id); 
 			} 
 		}
 		case 5:
@@ -1746,7 +1762,7 @@ public my_menu(id)
 		menu_additem(menu, "\y装备副武器", "3", 0);
 		menu_additem(menu, "\y装备特殊物品", "4", 0);
 		menu_additem(menu, "\w||新手指南||^n", "5", 0);
-		menu_additem(menu, "返回主選單", "6", 0);
+		menu_additem(menu, "返回主选单", "6", 0);
 		
 		menu_setprop(menu, MPROP_NUMBER_COLOR, "\r"); 
 		menu_setprop(menu, MPROP_BACKNAME, "返回"); 
@@ -1821,17 +1837,17 @@ public display_help_info(id)
 	format(title_text, charsmax(title_text), "* %s Ver:%s *", PLUGIN, VERSION)
 	
 	len += format(motd_text[len], maxlen-len, "<html><head><meta charset=UTF-8><style type=^"text/css^">pre{color:#FFB000;}body{background:#000000;margin-left:8px;margin-top:0px;}</style></head><pre><body>")
-	len += format(motd_text[len], maxlen-len, "^n^n<b>新手指南-幫助</b>^n")
+	len += format(motd_text[len], maxlen-len, "^n^n<b>新手指南-帮助</b>^n")
 	len += format(motd_text[len], maxlen-len, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^n")
-	len += format(motd_text[len], maxlen-len, "!!!感謝使用本插件!!!^n^n")
-	len += format(motd_text[len], maxlen-len, "本插件为 [FAITH]社区 基地建设专用升级^n")
-	len += format(motd_text[len], maxlen-len, "||等級系統|等級槍|永久物品|商城|技能升級|| 持續更新!!^n^n")
-	len += format(motd_text[len], maxlen-len, "永久物品一直有更新~玩家可到永久商城查閱,這些裝備一但購買後都能永久保存!相對價錢也會比較貴!^n")
+	len += format(motd_text[len], maxlen-len, "!!!感谢使用本插件!!!^n^n")
+	len += format(motd_text[len], maxlen-len, "本插件为 CyberTech Dev Team 制作 bb等级系统^n")
+	len += format(motd_text[len], maxlen-len, "||等级系统|永久物品|商城|技能升级|职业|| 持续更新!!^n^n")
+	len += format(motd_text[len], maxlen-len, "永久物品一直有更新~ 玩家可到永久商城查阅, 这些物品一但购买能永久保存! 同时价格较贵!^n")
 	len += format(motd_text[len], maxlen-len, "回合開始會顯示選槍選單，玩家可選擇裝備等級槍或永久槍械 & 物品^n")
 	len += format(motd_text[len], maxlen-len, "指令如下:^n")
-	len += format(motd_text[len], maxlen-len, "/help         :開啟指南^n")
-	len += format(motd_text[len], maxlen-len, "/bb_lvl       :開啟主選單(或按M)^n")
-	len += format(motd_text[len], maxlen-len, "/save         :儲存紀錄(也設有自動每秒存檔)^n^n")
+	len += format(motd_text[len], maxlen-len, "/help         :开启指南^n")
+	len += format(motd_text[len], maxlen-len, "/bb_lvl       :开启主选单(或按 'O' )^n")
+	len += format(motd_text[len], maxlen-len, "/save         :手动保存(回合结束自动保存)^n^n")
 	len += format(motd_text[len], maxlen-len, "-----------------------------------------------^n")
 	len += format(motd_text[len], maxlen-len, "特別道具介紹: ^n")
 	len += format(motd_text[len], maxlen-len, "震盪手雷 :能使喪屍 暈眩 , 減慢速度 !!但是太靠近自己也會受到影響 ^n")
@@ -1839,8 +1855,8 @@ public display_help_info(id)
 	len += format(motd_text[len], maxlen-len, "-----------------------------------------------^n")
 	len += format(motd_text[len], maxlen-len, "如有任如問題.Bug.建議 等等 請聯絡本人 (￣Д￣)ﾉ!^n")
 	len += format(motd_text[len], maxlen-len, "作者信息:^n")
-	len += format(motd_text[len], maxlen-len, "原作者:xD0625^n")
-	len += format(motd_text[len], maxlen-len, "修改:EmeraldGhost^n")
+	len += format(motd_text[len], maxlen-len, "作者: CyberTech @ EmeraldGhost^n")
+	len += format(motd_text[len], maxlen-len, "授权 FAITH 社区使用^n")
 	len += format(motd_text[len], maxlen-len, "http://steamcommunity.com/id/emeraldghost^n^n")
 	format(motd_text[len], maxlen-len, "</body></pre></html>")
 	
@@ -2199,10 +2215,10 @@ public skill_menu(id)
  {
 	new szMenuBody[512]
 	new len = format(szMenuBody, 511, "\r技能升级^n\w目前共有: \y%d\w Points^n", g_sp[id])
-	len += format(szMenuBody[len], 511-len, "^n\r1. \w攻击    [%d Points] \y[等级:%d/%d]",	g_skpD[id],	g_DamageLevel[id],	MaxLevel_Damage)
-	len += format(szMenuBody[len], 511-len, "^n\r2. \w速度    [%d Points] \y[等级:%d/%d]",	g_skpS[id],	g_SpeedLevel[id], 	MaxLevel_Speed)
-	len += format(szMenuBody[len], 511-len, "^n\r3. \w重力    [%d Points] \y[等级:%d/%d]",	g_skpG[id],	g_GravityLevel[id], MaxLevel_Gravity)
-	len += format(szMenuBody[len], 511-len, "^n\r4. \w生命    [%d Points] \y[等级:%d/%d]",	g_skpH[id],	g_HealthLevel[id],	MaxLevel_Health)
+	len += format(szMenuBody[len], 511-len, "^n\r1. \w攻击    [ 4 Points] \y[等级:%d/%d]",	g_DamageLevel[id],	MaxLevel_Damage)
+	len += format(szMenuBody[len], 511-len, "^n\r2. \w速度    [ 2 Points] \y[等级:%d/%d]", g_SpeedLevel[id], 	MaxLevel_Speed)
+	len += format(szMenuBody[len], 511-len, "^n\r3. \w重力    [15 Points] \y[等级:%d/%d]", g_GravityLevel[id], MaxLevel_Gravity)
+	len += format(szMenuBody[len], 511-len, "^n\r4. \w生命    [ 1 Points] \y[等级:%d/%d]", g_HealthLevel[id], MaxLevel_Health)
 	len += format(szMenuBody[len], 511-len, "^n^n\r5. \w重置技能点 \y500 Cash^n")
 	len += format(szMenuBody[len], 511-len, "^n\r0. 退出")
 
@@ -2211,7 +2227,7 @@ public skill_menu(id)
  }
  else
  {
- client_printc(id, "\g[技能系統] \t喪屍不能使用人類技能!")
+ client_printc(id, "\y[\g技能升级\y]   喪屍不能使用人类技能!")
  }
 }
 
@@ -2254,15 +2270,11 @@ public Action_PassiveUpgrades(id, key)
 		case 4: 
 		{
 			if(g_cash[id] >= 500) {
-			client_printc(id, "\g[技能系統] \t技能己重設!")
+			client_printc(id, "\y[\g技能升级\y]   技能以及职业已重设!")
 			g_cash[id] -= 500
-			g_sp[id] += g_skpH[id]*g_DamageLevel[id]
-			g_sp[id] += g_skpS[id]*g_SpeedLevel[id]
-			g_sp[id] += g_skpG[id]*g_GravityLevel[id]
-			g_sp[id] += g_skpD[id]*g_DamageLevel[id]
 			Resetskill(id)
 			} else {
-				client_printc(id, "\g[技能系統] \t你的金錢不足!");
+				client_printc(id, "\y[\g技能升级\y]   你的 \tCash \y不足!");
 			}
 		}
 	}
@@ -2279,15 +2291,15 @@ public Set_Upgrade(id, value)
 			{
             if(g_sp[id] >= 4)
 			  {
-				g_sp[id] -= g_skpD[id]
+				g_sp[id] -= 4
 				g_DamageLevel[id]  += 1
 				
-				client_printc(id, "\g[技能系統] \t攻擊提升 1 等級 (增加傷害)!")
+				client_printc(id, "\y[\g技能升级\y]   \t攻擊提升 1 等級 (增加傷害)!")
 				skill_menu(id)
 			  }
               else
               {
-                client_printc(id, "\g[技能系統] \r你的技能點不足!")
+                client_printc(id, "\y[\g技能升级\y]   \r你的技能點不足!")
 				skill_menu(id)
               }
             }
@@ -2295,16 +2307,16 @@ public Set_Upgrade(id, value)
                                           {
                                            if(g_sp[id] >= 2)
 			{
-				g_sp[id] -= g_skpS[id]
+				g_sp[id] -= 2
 				g_SpeedLevel[id]  += 1
 				set_pev(id,pev_maxspeed, 240.0 + ( g_SpeedLevel[id] * Speed_PerLevel ) )
 				reset_player_speed(id)
-				client_printc(id, "\g[技能系統] \t速度提升 1 等級 (加快速度)!")
+				client_printc(id, "\y[\g技能升级\y]   \t速度提升 1 等級 (加快速度)!")
 				skill_menu(id)
 			}
                                            else
                                            {
-client_printc(id, "\g[技能系統] \r你的技能點 不足!")
+client_printc(id, "\y[\g技能升级\y]   \r你的技能點 不足!")
 				skill_menu(id)
                                             }
                                     }
@@ -2312,35 +2324,35 @@ client_printc(id, "\g[技能系統] \r你的技能點 不足!")
                                           {
                                            if(g_sp[id] >= 15)
 			{
-				g_sp[id] -= g_skpG[id]
+				g_sp[id] -= 15
 				g_GravityLevel[id]  += 1
 				new Float: fGravity = g_GravityLevel[id] * Gravity_PerLevel
 				set_gravity(id, fGravity)
-				client_printc(id, "\g[技能系統] \t重力提升 1 等級 (降低重力)!")
+				client_printc(id, "\y[\g技能升级\y]   \t重力提升 1 等級 (降低重力)!")
 				skill_menu(id)
 			}
                                            else
                                            {
-client_printc(id, "\g[技能系統] \r你的技能點不足!")
+client_printc(id, "\y[\g技能升级\y]   \r你的技能點不足!")
 				skill_menu(id)
                                             }
                                     }
 			case 3:
-                                          {
-                                           if(g_sp[id] >= 1)
-			{
-				g_sp[id] -= g_skpH[id]
-				g_HealthLevel[id] += 1
-				add_health(id, Health_PerLevel)
-				client_printc(id, "\g[技能系統] \t生命增加 1 等級 (增加血量)!")
-				skill_menu(id)
-			}
-                                           else
-                                           {
-client_printc(id, "\g[技能系統] \t你的技能點不足!")
-				skill_menu(id)
-                                            }
-                                    }
+            {
+				if(g_sp[id] >= 1)
+				{
+					g_sp[id] -= 1
+					g_HealthLevel[id] += 1
+					add_health(id, Health_PerLevel)
+					client_printc(id, "\y[\g技能升级\y]   \t生命增加 1 等級 (增加血量)!")
+					skill_menu(id)
+				}
+				else
+				{
+					client_printc(id, "\y[\g技能升级\y]   \t你的技能點不足!")
+					skill_menu(id)
+				}
+				}
 		}
 	}
 }
@@ -2390,19 +2402,19 @@ public job_select_menu_handler(id, menu, item)
 		case 1:
 		{
 			iPlayerJob[id] = JOB_WEAPONER
-			client_printc(id, "\g[职业系统] \y选择职业 \t武器专家 \y成功 !")
+			client_printc(id, "\g[职业系统]   \y选择职业 \t武器专家 \y成功 !")
 			return PLUGIN_HANDLED;
 		}
 		case 2:
 		{
 			iPlayerJob[id] = JOB_KILLER
-			client_printc(id, "\g[职业系统] \y选择职业 \t刺客 \y成功 !")
+			client_printc(id, "\g[职业系统]   \y选择职业 \t刺客 \y成功 !")
 			return PLUGIN_HANDLED;
 		}
 		case 3:
 		{
 			iPlayerJob[id] = JOB_MAGICAL
-			client_printc(id, "\g[职业系统] \y选择职业 \t魔法师 \y成功 !")
+			client_printc(id, "\g[职业系统]   \y选择职业 \t魔法师 \y成功 !")
 			return PLUGIN_HANDLED;
 		}
 	}
