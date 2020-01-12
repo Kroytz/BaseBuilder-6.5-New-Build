@@ -50,7 +50,7 @@
 #define Is_CustomItem(%0)			(pev(%0,pev_impulse)==WEAPON_KEY)
 
 #define model_v		"models/FAITH/v_pgm.mdl"
-#define model_p		"models/p_awp.mdl"
+#define model_p		"models/FAITH/p_pgm.mdl"
 #define model_w		"models/FAITH/w_pgm.mdl"
 
 #define weapon_punchangle		1.0	
