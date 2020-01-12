@@ -149,7 +149,7 @@ new const cfg_szGameTip_Zombie[][] = {
 #define FLAGS_RELEASE 	ADMIN_BAN
 #define FLAGS_OVERRIDE 	ADMIN_RCON
 
-#define VERSION "6.5 N.02R"
+#define VERSION "6.5 N.03R"
 #define MODNAME "^x01[^x04基地建设^x01]  "
 
 #define LockBlock(%1,%2)  	( entity_set_int( %1, EV_INT_iuser1,     %2 ) )
@@ -210,6 +210,8 @@ new g_iMaxPlayers
 new g_msgSayText, g_msgStatusText, g_msgDamage, g_msgScreenFade
 new g_HudSync
 
+new bool:g_bBossOverride;
+
 new g_isConnected[MAXPLAYERS+1]
 new g_isAlive[MAXPLAYERS+1]
 new g_isZombie[MAXPLAYERS+1]
@@ -228,7 +230,8 @@ enum (+= 5000)
 	TASK_IDLESOUND, 
 	TASK_ZADDHP, 
 	TASK_MVP, 
-	TASK_BGM
+	TASK_BGM, 
+    TASK_AUTOBOSS
 }
 
 //Custom Sounds
@@ -857,7 +860,7 @@ public plugin_natives()
 
 public FX_Environment()
 {
-	engfunc(EngFunc_LightStyle, 0, "b")
+	engfunc(EngFunc_LightStyle, 0, "b")	// i
 }
 
 public CMD_NightVision(id)
@@ -1319,6 +1322,7 @@ public ham_TakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 	if(g_boolCanBuild || g_boolRoundEnded || g_boolPrepTime)
 	{
 		damage *= 0.0;
+		return HAM_SUPERCEDE;
 	}
 		
 	if (victim == attacker)
@@ -1525,6 +1529,11 @@ public task_PrepTime()
 	return PLUGIN_CONTINUE;
 }
 
+public task_AutoBoss()
+{
+    g_bBossOverride = true;
+}
+
 public logevent_round_end()
 {
 	if (g_boolRoundEnded)
@@ -1640,33 +1649,43 @@ public ham_PlayerKilled(victim, attacker, shouldgib)
 				
 		if(AppearedNum < g_iThisRoundBossNum) // Not all boss appeared
 		{
-			// Maybe u can be the boss.
-			new iNum = random_num(1, 10)
-			switch(iNum)
-			{
-				case 2..3: 
-				{
-					Boss_Appear(victim);
-					return PLUGIN_HANDLED;
-				}
-			}
-				
-			if(g_iZombieKilled >= g_iBossAppearNeedKill) // Reached count but no boss before
-			{
-				Boss_Appear(victim)
-			}
+            if(g_bBossOverride) // task: Force override?
+            {
+                Boss_Appear(victim, TYPE_NEMESIS);
+            }
+            else
+            {
+                // Maybe u can be the boss.
+                new iNum = random_num(1, 10)
+                switch(iNum)
+                {
+                    case 2..3: 
+                    {
+                        Boss_Appear(victim, -1);
+                        return PLUGIN_HANDLED;
+                    }
+                }
+                    
+                if(g_iZombieKilled >= g_iBossAppearNeedKill) // Reached count but no boss before
+                {
+                    Boss_Appear(victim, -1);
+                }
+            }
 		}
 	}
 
 	return HAM_IGNORED;
 }
 
-public Boss_Appear(id)
+public Boss_Appear(id, overridetype)
 {
-	new BossType = random_num(0, BOSS_NUM-1)
+	new BossType = overridetype;
+    if(BossType < 0)
+        random_num(0, BOSS_NUM-1);
+
 	if(g_bBossAppeared[BossType]) // Appeared Reselect
 	{
-		Boss_Appear(id)
+		Boss_Appear(id, -1);
 		return PLUGIN_HANDLED
 	}
 	
@@ -1720,7 +1739,7 @@ public ham_PlayerSpawn_Post(id)
 
 		if (g_boolFirstSpawn[id])
 		{
-			client_printc(id, "\y[\g基地建设\y]   插件信息: 基地建设6.5N.03R - 资料片: 黎明前夜 - 修改: EmeraldGhost")
+			client_printc(id, "\y[\g基地建设\y]   当前插件版本: N3.03R - 资料片: 黎明前夜 - G Monster 降临")
 			g_boolFirstSpawn[id] = false
 		}
 
@@ -1810,7 +1829,7 @@ public ham_PlayerSpawn_Post(id)
 				if(AppearedNum > KilledNum)
 				{
 					set_pev(id, pev_health, float(ArrayGetCell(g_zclass_hp, g_iZombieClass[id])) + 1500.0)
-					client_printc(id, "\y[\g基地建设\y] 由于本回合 \tBoss\y 已出现且存活, 你的血量增加 \g1500\y 点.")
+					client_printc(id, "\y[\g基地建设\y]   由于本回合 \tBoss\y 已出现且存活, 你的血量增加 \g1500\y 点.")
 				}
 				
 				// Angry
@@ -1883,7 +1902,7 @@ public task_ZAddHealth(taskid)
 		add_health(taskid, g_iAngryCount[taskid] * 500)
 		give_item(taskid, "item_assaultsuit");
 		cs_set_user_armor(taskid, g_iAngryCount[taskid] * 200, CS_ARMOR_VESTHELM);
-		client_printc(taskid, "\y[\g基地建设\y] 当前怒气: \tLv.%d\y, 已为你增加 \t%d\y 血量 & \t%d\y 护甲.", g_iAngryCount[taskid], g_iAngryCount[taskid] * 500, g_iAngryCount[taskid] * 200)
+		client_printc(taskid, "\y[\g基地建设\y]   当前怒气: \tLv.%d\y, 已为你增加 \t%d\y 血量 & \t%d\y 护甲.", g_iAngryCount[taskid], g_iAngryCount[taskid] * 500, g_iAngryCount[taskid] * 200)
 	}
 }
 
@@ -2474,6 +2493,8 @@ public Release_Zombies()
 	client_cmd(0, "spk %s", g_szRoundStart[ random( sizeof g_szRoundStart ) ] )
 	*/
 	Show_GameTip(4)
+
+    set_task(90.0, "task_AutoBoss", TASK_AUTOBOSS);
 	
 	BC_NormalBGM()
 	server_cmd("bb_random_leader")
@@ -3406,7 +3427,7 @@ public show_menu_game(id)
 	userflags = get_user_flags(id)
 	
 	// Title
-	len += formatex(menu[len], charsmax(menu) - len, "\y基地建设 6.5^n修改：CyberTech Dev Team.^n版本号：65C-20190814Night^n^n")
+	len += formatex(menu[len], charsmax(menu) - len, "\y基地建设 6.5^n修改：CyberTech Dev Team.^n版本号：65N-20190814Night-03R^n^n")
 	
 	len += formatex(menu[len], charsmax(menu) - len, "\r1.\w 丧屍类型选择 \d/Class^n")
 	len += formatex(menu[len], charsmax(menu) - len, "\r2.\w 复活(丧屍出笼前) \d/Revive^n^n")
