@@ -15,14 +15,15 @@
 #define COMPOSE_TYPE_C 500
 #define COMPOSE_TYPE_D 750
 
-new const has_model[][] = { "[未拥有]", "[已拥有]" }
+native zp_donater_get_level(id)
+new const has_model[][] = { "\d", "\r" }
 
-new const model_name[][] = { "null", "【蕾米莉亚】", "【黑白.涅普基雅】", "【五河琴里】", "【四糸乃】", "【時崎狂三】", "【SnowWhite Miku】", "(特殊笑声)【琪露诺】", "(限定)【克劳德】", "(置换.Lv1)【尼尔.2B】", "(置换.Lv1)【ELO-诗乃】", "(置换.Lv2)【泳装.和泉纱雾】" }
+new const model_name[][] = { "null", "【蕾米莉亚】", "【黑白.涅普基雅】", "【五河琴里】", "【四糸乃】", "【時崎狂三】", "【SnowWhite Miku】", "(特殊笑声)【琪露诺】", "(限定)【克劳德】", "(限定)【白上吹雪】", "(置换.Lv1)【尼尔.2B】", "(置换.Lv1)【ELO-诗乃】", "(置换.Lv2)【泳装.和泉纱雾】" }
 //new const model_cost[] = { 0, 500, 1000, 1500, 1500, 1500, 1500, 750, 3000, 99999, 99999 } // 非活动
 //new const model_sell[] = { 0, 250, 500, 750, 750, 750, 750, 425, 1000, 1000, 1000 } // 非活动
-new const model_cost[] = { 0, 250, 500, 750, 750, 750, 500, 375, 1500, 99999, 99999, 99999 } // 活动
-new const model_sell[] = { 0, 125, 250, 375, 375, 375, 250, 150, 750, 1000, 1000, 2000 } // 活动
-new const model_code[][] = { "null", "remilia", "bwgear", "kotori", "yoshino", "kurumi", "swmiku", "cirno", "cloud", "nier2b", "eloshino", "sagiri" }
+new const model_cost[] = { 0, 500, 1000, 1500, 1500, 1500, 1000, 750, 99999, 3000, 99999, 99999, 99999 } // 活动
+new const model_sell[] = { 0, 250, 500, 750, 750, 750, 500, 375, 750, 1500, 800, 800, 1500 } // 活动
+new const model_code[][] = { "null", "remilia", "bwgear", "kotori", "yoshino", "kurumi", "swmiku", "cirno", "cloud", "fubuki", "nier2b", "eloshino", "sagiri" }
 
 enum
 {
@@ -35,6 +36,7 @@ enum
 	MODEL_SWMIKU, 
 	MODEL_CIRNO, 
 	MODEL_CLOUD, 
+	MODEL_FUBUKI, 
 	MODEL_NIER2B, 
 	MODEL_SHINO, 
 	MODEL_SAGIRI
@@ -54,7 +56,7 @@ new error[33]
 
 public plugin_init()
 {
-	register_plugin("[eG] ZP Store - Skin", "v20181124", "EmeraldGhost")
+	register_plugin("[ZPM] Store - Skin", "1.0", "EmeraldGhost")
 	
 	// SQL Initionlize
 	new sql_host[64], sql_user[64], sql_pass[64], sql_db[64]
@@ -122,11 +124,11 @@ public load_data(id)
 	replace_all(authid, 32, "`", "\`")
 	replace_all(authid, 32, "'", "\'")
 
-	result = dbi_query(sql, "SELECT remilia,bwgear,kotori,yoshino,kurumi,swmiku,cirno,cloud,nier2b,eloshino,sagiri FROM skinstore WHERE name='%s'", authid)
+	result = dbi_query(sql, "SELECT remilia,bwgear,kotori,yoshino,kurumi,swmiku,cirno,cloud,fubuki,nier2b,eloshino,sagiri FROM skinstore WHERE name='%s'", authid)
 
 	if(result == RESULT_NONE)
 	{
-		dbi_query(sql, "INSERT INTO skinstore(name,remilia,bwgear,kotori,yoshino,kurumi,swmiku,cirno,cloud,nier2b,eloshino,sagiri) VALUES('%s','0','0','0','0','0','0','0','0','0','0','0')", authid)
+		dbi_query(sql, "INSERT INTO skinstore(name,remilia,bwgear,kotori,yoshino,kurumi,swmiku,cirno,cloud,fubuki,nier2b,eloshino,sagiri) VALUES('%s','0','0','0','0','0','0','0','0','0','0','0','0')", authid)
 	}
 	else if(result <= RESULT_FAILED)
 	{
@@ -154,7 +156,7 @@ public skin_menu(id)
 			new iSkin = iPlayerHasSkin[id][i]
 		
 			new szItems[101]
-			formatex(szItems, 100, "\y%s\r%s - %d 金币", has_model[iSkin], model_name[i], model_cost[i])
+			formatex(szItems, 100, "%s%s \y| \d%d \y金币", has_model[iSkin], model_name[i], model_cost[i])
 			num_to_str(i, szTempid, 31)
 			menu_additem(menu, szItems, szTempid, 0)
 		}
@@ -552,17 +554,19 @@ public try_compose_skin(id, skinid)
 	else if(model_cost[skinid] == COMPOSE_TYPE_B) MaxNum = 950
 	else if(model_cost[skinid] == COMPOSE_TYPE_C) MaxNum = 920
 	else if(model_cost[skinid] == COMPOSE_TYPE_D) MaxNum = 965
-	else if(model_cost[skinid] == 99999) MaxNum = 700
+	else if(model_cost[skinid] == 99999) MaxNum = 600
+	
+	if(zp_donater_get_level(id) == 10) MaxNum -= 10
 	
 	new cNum = random_num(1, MaxNum)
 	switch(cNum)
 	{
-		case 436..476:
+		case 436..446:
 		{
-			new comNum = random_num(1, 2)
+			new comNum = random_num(1, 10)
 			switch(comNum)
 			{
-				case 1:
+				case 1..4:
 				{
 					if(iPlayerHasSkin[id][MODEL_NIER2B] == 0)
 					{
@@ -579,7 +583,7 @@ public try_compose_skin(id, skinid)
 						return PLUGIN_HANDLED;
 					}
 				}
-				case 2:
+				case 5..8:
 				{
 					if(iPlayerHasSkin[id][MODEL_SHINO] == 0)
 					{
@@ -596,41 +600,29 @@ public try_compose_skin(id, skinid)
 						return PLUGIN_HANDLED;
 					}
 				}
-			}
-		}
-		case 507..527:
-		{
-			if(iPlayerHasSkin[id][MODEL_SAGIRI] == 0)
-			{
-				iPlayerHasSkin[id][skinid] = 0
-				iPlayerHasSkin[id][MODEL_SAGIRI] = 1
-				log_compose(id, skinid, MODEL_SAGIRI)
-				save_data(id)
-				client_printc(0, "\g[Compose] \t%s\y 使用了\t%s\y参与置换，成功置换\t【泳装.和泉纱雾】\y皮肤 !", name, model_name[skinid])
-				return PLUGIN_HANDLED;
-			}
-			else
-			{
-				client_printc(0, "\g[Compose] \t%s\y 使用了\t%s\y参与置换，本来可以置换\t【泳装.和泉纱雾】\y皮肤，可惜他有了！", name, model_name[skinid])
-				return PLUGIN_HANDLED;
-			}
-		}
-		case 604..699:
-		{
-			new nSkin = random_num(MODEL_REMILIA, MODEL_CIRNO)
-			if(iPlayerHasSkin[id][nSkin] == 0)
-			{
-			iPlayerHasSkin[id][skinid] = 0
-			iPlayerHasSkin[id][nSkin] = 1
-			log_compose(id, skinid, nSkin)
-			save_data(id)
-			client_printc(0, "\g[Compose] \t%s\y 使用了\t%s\y参与置换，成功置换\t%s\y皮肤 !", name, model_name[skinid], model_name[nSkin])
-			return PLUGIN_HANDLED;
-			}
-			else
-			{
-				client_printc(0, "\g[Compose] \t%s\y 使用了\t%s\y参与置换，本来可以置换\t%s\y皮肤，可惜已有！", name, model_name[skinid], model_name[nSkin])
-				return PLUGIN_HANDLED;
+
+
+				case 9..10:
+				{
+
+					if(iPlayerHasSkin[id][MODEL_SAGIRI] == 0)
+					{
+
+						iPlayerHasSkin[id][skinid] = 0
+						iPlayerHasSkin[id][MODEL_SAGIRI] = 1
+						log_compose(id, skinid, MODEL_SAGIRI)
+						save_data(id)
+						client_printc(0, "\g[Compose] \t%s\y 使用了\t%s\y参与置换，成功置换\t【泳装.和泉纱雾】\y皮肤 !", name, model_name[skinid])
+						return PLUGIN_HANDLED;
+					}
+
+					else
+					{
+
+						client_printc(0, "\g[Compose] \t%s\y 使用了\t%s\y参与置换，本来可以置换\t【泳装.和泉纱雾】\y皮肤，可惜他有了！", name, model_name[skinid])
+						return PLUGIN_HANDLED;
+					}
+				}
 			}
 		}
 	}

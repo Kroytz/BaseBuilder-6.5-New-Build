@@ -17,8 +17,8 @@ new const vip_models_path[][] = { "", "zmParaDipsy", "BlackRockShooter", "nyaruk
 new const admin_models_name[][] = { "", "大鸡鸡"  }
 new const admin_models_path[][] = { "", "zmParaBigChick" }
 
-new const store_models_name[][] = { "", "蕾米莉亚", "黑白.涅普基雅", "五河琴里.新", "四糸乃", "時崎狂三", "SnowWhite Miku", "(特殊笑声)琪露诺", "(限定)克劳德", "(置换.Lv1)尼尔-2B", "(置换.Lv1)ELO-诗乃", "(置换.Lv2)泳装.和泉纱雾" }
-new const store_models_path[][] = { "", "remilia", "nepgear_bw", "zmParaKotori", "yoshino", "kurumi", "snowwhitemiku", "cirno", "zmParaCloud", "yorha_2b", "asainuo", "zmParaSagiri" }
+new const store_models_name[][] = { "", "蕾米莉亚", "黑白.涅普基雅", "五河琴里.新", "四糸乃", "時崎狂三", "SnowWhite Miku", "(特殊笑声)琪露诺", "(限定)克劳德", "(限定)白上吹雪", "(置换.Lv1)尼尔-2B", "(置换.Lv1)ELO-诗乃", "(置换.Lv2)泳装.和泉纱雾" }
+new const store_models_path[][] = { "", "remilia", "nepgear_bw", "zmParaKotori", "yoshino", "kurumi", "snowwhitemiku", "cirno", "zmParaCloud", "zmParaFubuki", "yorha_2b", "asainuo", "zmParaSagiri" }
 
 native zpm_store_get_user_skin(id, skinid)
 
