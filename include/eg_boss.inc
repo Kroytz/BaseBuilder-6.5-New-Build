@@ -8,6 +8,9 @@
 #define DEF_SPSMG_CODE "NewComenFkingPro"
 #define DEF_FIRECRACKER_CODE "FireCrackerGLSec"
 #define DEF_M32_CODE "GayGunM32Lun9GunJJ"
+#define DEF_PGM_CODE "PGMHecateMKII"
+#define DEF_OICW_CODE "JDYSOICW233"
+#define DEF_BGV_CODE "BalrogVBalrog"
 
 native z4e_burn_get(id);
 native z4e_burn_set(id, Float:flTime, bDrawEffect);
