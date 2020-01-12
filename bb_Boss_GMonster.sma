@@ -202,7 +202,10 @@ public HamFW_TakeDamage(victim, inflictor, attacker, Float:damage, damagebits)
 		return HAM_IGNORED
 
 	if (g_bBossExHit)
-		damage *= 99.0
+	{
+		SetHamParamFloat(4, 9999.0);
+		return HAM_OVERRIDE
+	}
 }
 
 public Skill_ExHit_Off(taskid)
